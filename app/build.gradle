@@ -1,0 +1,128 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.plugin.compose' version '2.0.0'
+}
+
+android {
+    compileSdk 37
+
+    defaultConfig {
+        applicationId "io.github.xejohv.libreraclassic"
+        minSdk 26
+        targetSdk 34
+        versionCode 23
+        versionName "1.19"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // 只用这两种语言：资源表里其余 80 多种翻译全部丢弃
+        resourceConfigurations += ['zh-rCN', 'en']
+        ndk { abiFilters 'arm64-v8a' }
+    }
+
+    def localProps = new Properties()
+    def localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        localPropsFile.withInputStream { localProps.load(it) }
+    }
+
+    signingConfigs {
+        pod {
+            storeFile file("../podclassic.keystore")
+            storePassword localProps.getProperty("pod.storePassword", "")
+            keyAlias localProps.getProperty("pod.keyAlias", "podclassic")
+            keyPassword localProps.getProperty("pod.keyPassword", "")
+        }
+    }
+
+    // 签名兜底：本机存在 keystore 且配置了密码就用正式签名，否则退回 debug 签名
+    def podReady = rootProject.file("podclassic.keystore").exists()
+        && localProps.getProperty("pod.storePassword", "").length() > 0
+
+    buildTypes {
+        release {
+            signingConfig podReady ? signingConfigs.pod : signingConfigs.debug
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'proguard-reader.pro'
+            zipAlignEnabled = true
+            shrinkResources = true
+        }
+
+        // 真机自测用：与 release 同配置（R8 + 正式签名），可直接覆盖设备上在跑的 v1.5.89
+        pod {
+            initWith release          // 先继承，再覆盖，顺序反了就不生效
+            minifyEnabled true
+            shrinkResources true
+            signingConfig podReady ? signingConfigs.pod : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+        encoding = 'UTF-8'
+    }
+
+    tasks.withType(JavaCompile) {
+        options.compilerArgs += ["-Xlint:unchecked"]
+    }
+    namespace = 'io.github.xejohv.podclassicxzs'
+
+    buildFeatures {
+        compose true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = '1.5.8'
+    }
+    // .so 压缩存放：整包小约 12 MB，安装时解压到 /data/app（这台机器只装一次）
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+}
+
+// 鍚敤 Compose Source Information
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+        freeCompilerArgs += [
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:sourceInformation=true"
+        ]
+    }
+}
+
+dependencies {
+    // the reader is folded in: shelf, page shell, document activities, all in :reader
+    implementation project(':reader')
+
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+
+    // Jetpack Compose
+    def composeBom = platform('androidx.compose:compose-bom:2024.02.00')
+    implementation composeBom
+    androidTestImplementation composeBom
+
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.animation:animation'
+    implementation 'androidx.compose.foundation:foundation'
+
+    implementation 'androidx.activity:activity-compose:1.8.2'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0'
+}
+
+// pdfiumandroid ships Kotlin 2.4 metadata, but this project compiles Kotlin with 2.2.
+// Pin the stdlib to the same line or every Kotlin source in :app fails to resolve.
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:2.2.10'
+    }
+}

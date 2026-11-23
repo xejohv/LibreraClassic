@@ -1,0 +1,77 @@
+// The reader, folded into the player. It is a library now: the shelf, the page shell and the
+// document activities all live inside the one PodClassic APK and run in its :reader process,
+// so nothing here may carry an applicationId or a launcher of its own.
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.foobnix.pdf.info'
+    compileSdk 37
+
+    defaultConfig {
+        minSdk 26
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java', 'src/noGms/java', 'src/libpro/java', 'src/fdroid/java']
+            res.srcDirs = ['src/main/res', 'src/fdroid/res']
+            jniLibs.srcDirs = ['src/main/jniLibs']
+            aidl.srcDirs = ['src/main/aidl']
+            assets.srcDirs = ['src/main/assets']
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+        encoding = 'UTF-8'
+    }
+
+    buildFeatures {
+        buildConfig true
+        aidl true
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    buildTypes {
+        // 与 :app 的真机自测变体同名，否则 :app:pod 解析不到匹配的 library variant
+        pod {}
+    }
+}
+
+dependencies {
+    // the reader calls the current androidx.core compat helpers; the legacy-support line
+    // otherwise drags an old core in and BundleCompat/IntentCompat go missing
+    implementation 'androidx.core:core:1.12.0'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.work:work-runtime:2.9.1'
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.activity:activity:1.8.2'
+    implementation 'org.greenrobot:eventbus:3.3.1'
+    implementation 'org.greenrobot:greendao:3.3.0'
+    implementation 'org.greenrobot:greendao-api:3.3.0'
+    implementation 'org.jsoup:jsoup:1.24.1'
+    implementation 'com.github.albfernandez:juniversalchardet:2.5.2'
+    implementation 'com.squareup.okhttp3:okhttp:3.12.6'
+    implementation 'io.github.rburgst:okhttp-digest:3.1.1'
+    implementation 'com.squareup.okio:okio-parent:1.17.6'
+    implementation 'net.lingala.zip4j:zip4j:2.11.6'
+    implementation 'io.legere:pdfiumandroid:2.0.3'
+    implementation 'io.legere:pdfiumandroid-core:2.0.3'
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
+    // 合并后必须保留：Glide 的 AppGlideModule 靠注解处理器生成，漏了它页面位图全部加载失败
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
+    implementation 'commons-logging:commons-logging-api:1.1'
+    implementation 'com.google.guava:guava:33.8.0-android'
+    implementation 'org.commonmark:commonmark:0.29.0'
+    implementation 'org.commonmark:commonmark-ext-gfm-tables:0.30.0'
+}

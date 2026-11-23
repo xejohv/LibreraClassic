@@ -1,0 +1,826 @@
+package io.github.xejohv.classic;
+
+import android.app.Activity;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+
+import com.foobnix.model.AppState;
+import com.foobnix.pdf.info.model.BookCSS;
+import com.foobnix.pdf.info.R;
+import com.foobnix.pdf.info.wrapper.DocumentController;
+
+/**
+ * The page of a dedicated player, iPod style: a book and two thin bars.
+ *
+ * The reader ships with a full Android toolbar of its own - a title row, a row of icons,
+ * a footer of eight buttons, a shelf panel and page counters. None of that belongs on a
+ * player, so it is hidden whole and replaced with what an iPod shows: the title, the page
+ * number, a hairline progress bar, and one list menu opened by a tap in the middle of the
+ * page. Settings live in that same list, one level down, as plain rows instead of sliders.
+ */
+public final class PodReader {
+
+    private static final String TAG = "pod_reader_shell";
+    private static final int BG = Color.BLACK;
+    private static final int FG = Color.WHITE;
+    private static final int DIM = Color.parseColor("#8E8E93");
+    private static final int RED = Color.parseColor("#FF3B30");
+    private static final int LINE = Color.parseColor("#1F1F1F");
+    private static final int PRESS = Color.parseColor("#2C2C2E");
+
+    /** Everything the reader draws around the page: title row, icon row, footer, shelf, counters. */
+    private static final int[] OLD_CHROME = {
+            R.id.actionBar, R.id.bottomBar, R.id.bottomPanel, R.id.pageshelper,
+            R.id.pagesBookmark, R.id.floatingBookmark, R.id.pannelBookTitle,
+            R.id.musicButtonPanel, R.id.bookCoverParent, R.id.bookClose,
+            R.id.showRewardVideo, R.id.showRewardVideoText, R.id.showRewardVideoButton,
+            R.id.toastBrightnessText, R.id.ttsActive, R.id.ttsActive1, R.id.ttsActivePage,
+            R.id.drawDock, R.id.pagesTime, R.id.pagesPower, R.id.pagesCountIndicator
+    };
+
+    /** The controller of the page on screen; kept so a menu row can re-lay the text. */
+    private static java.lang.ref.WeakReference<DocumentController> CONTROLLER;
+
+    private PodReader() {
+    }
+
+    public static void install(Activity a, DocumentController dc) {
+        if (a == null) {
+            return;
+        }
+        DocumentController known = dc != null ? dc : resolveController(a);
+        if (known != null) {
+            CONTROLLER = new java.lang.ref.WeakReference<>(known);
+        }
+        View root = a.getWindow().getDecorView();
+        if (!(root instanceof FrameLayout)) {
+            return;
+        }
+        FrameLayout frame = (FrameLayout) root;
+        // a fresh install inherits the big-screen default of 24, which reads far too large
+        // on this device; start from the standard step and remember it
+        try {
+            if (BookCSS.get().fontSizeSp >= 24 || BookCSS.get().fontSizeSpFoliate >= 24) {
+                BookCSS.get().fontSizeSp = 17;
+                BookCSS.get().fontSizeSpFoliate = 17;
+                BookCSS.get().save(a);
+            }
+        } catch (Throwable ignored) {
+        }
+        hide(a, OLD_CHROME);
+        insetPages(a);
+        frame.setBackgroundColor(BG);
+
+        View shell = frame.findViewWithTag(TAG);
+        if (shell == null) {
+            shell = buildShell(a, dc);
+            shell.setTag(TAG);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -1);
+            frame.addView(shell, lp);
+            startTicker(a, shell);
+        }
+        refresh(a, shell);
+    }
+
+    /** Keeps the two bars truthful after a page turn. */
+    public static void refresh(Activity a) {
+        View root = a == null ? null : a.getWindow().getDecorView();
+        if (!(root instanceof ViewGroup)) {
+            return;
+        }
+        View shell = ((ViewGroup) root).findViewWithTag(TAG);
+        if (shell != null) {
+            refresh(a, shell);
+        }
+    }
+
+    /** Keeps the page clear of the two thin bars instead of letting the text run under them. */
+    private static void insetPages(Activity a) {
+        View pager = a.findViewById(R.id.pager2);
+        if (pager == null) {
+            return;
+        }
+        ViewGroup.LayoutParams raw = pager.getLayoutParams();
+        if (!(raw instanceof ViewGroup.MarginLayoutParams)) {
+            return;
+        }
+        ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) raw;
+        if (lp.topMargin > 0) {
+            return;
+        }
+        lp.topMargin = dp(a, 56);
+        lp.bottomMargin = dp(a, 58);
+        pager.setLayoutParams(lp);
+        pager.setBackgroundColor(BG);
+    }
+
+    private static void startTicker(final Activity a, final View shell) {
+        final Handler h = new Handler(Looper.getMainLooper());
+        h.postDelayed(new Runnable() {
+            @Override public void run() {
+                if (a.isFinishing() || shell.getParent() == null) {
+                    return;
+                }
+                refresh(a, shell);
+                h.postDelayed(this, 900);
+            }
+        }, 900);
+    }
+
+    private static void refresh(Activity a, View shell) {
+        TextView page = shell.findViewWithTag(TAG + "_page");
+        TextView title = shell.findViewWithTag(TAG + "_title");
+        View fill = shell.findViewWithTag(TAG + "_fill");
+        if (title != null) {
+            TextView old = a.findViewById(R.id.title);
+            if (old != null && old.getText() != null && old.getText().length() > 0) {
+                title.setText(old.getText());
+            }
+        }
+        int cur = 0;
+        int max = 0;
+        View probe = a.findViewById(R.id.seekBar1);
+        if (probe instanceof ProgressBar) {
+            cur = ((ProgressBar) probe).getProgress();
+            max = ((ProgressBar) probe).getMax();
+        }
+        if (page != null) {
+            page.setText((cur + 1) + " / " + Math.max(1, max + 1));
+        }
+        if (fill != null && fill.getParent() instanceof View) {
+            View track = (View) fill.getParent();
+            int width = track.getWidth();
+            if (width > 0) {
+                float ratio = max <= 0 ? 0f : Math.min(1f, (cur + 1) / (float) (max + 1));
+                fill.getLayoutParams().width = Math.max(2, (int) (width * ratio));
+                fill.requestLayout();
+            }
+        }
+    }
+
+    private static View buildShell(Activity a, DocumentController dc) {
+        FrameLayout shell = new FrameLayout(a);
+        shell.setBackgroundColor(Color.TRANSPARENT);
+
+        // top: back mark, book title, page number, hairline
+        LinearLayout top = new LinearLayout(a);
+        top.setOrientation(LinearLayout.VERTICAL);
+        top.setBackgroundColor(BG);
+
+        LinearLayout topRow = new LinearLayout(a);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        topRow.setPadding(dp(a, 14), dp(a, 10), dp(a, 14), dp(a, 10));
+
+        TextView back = new TextView(a);
+        back.setText("\u2039 \u4e66\u5e93");
+        back.setTextColor(RED);
+        back.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        back.setTypeface(Typeface.DEFAULT_BOLD);
+        back.setPadding(0, dp(a, 4), dp(a, 12), dp(a, 4));
+        back.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                // the shelf is the page underneath this one
+                ((Activity) v.getContext()).finish();
+            }
+        });
+        topRow.addView(back, new LinearLayout.LayoutParams(-2, -2));
+
+        TextView title = new TextView(a);
+        title.setTag(TAG + "_title");
+        title.setTextColor(FG);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setSingleLine(true);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        topRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+
+        TextView page = new TextView(a);
+        page.setTag(TAG + "_page");
+        page.setTextColor(DIM);
+        page.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        page.setGravity(Gravity.RIGHT);
+        topRow.addView(page, new LinearLayout.LayoutParams(-2, -2));
+
+        top.addView(topRow, new LinearLayout.LayoutParams(-1, -2));
+        top.addView(hairline(a));
+
+        FrameLayout.LayoutParams topLp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
+        shell.addView(top, topLp);
+
+        // bottom: page number and a hairline progress bar
+        LinearLayout bottom = new LinearLayout(a);
+        bottom.setOrientation(LinearLayout.VERTICAL);
+        bottom.setBackgroundColor(BG);
+        bottom.setPadding(dp(a, 16), dp(a, 8), dp(a, 16), dp(a, 10));
+
+        LinearLayout track = new LinearLayout(a);
+        track.setOrientation(LinearLayout.HORIZONTAL);
+        track.setBackgroundColor(Color.parseColor("#3A3A3C"));
+        track.setTag(TAG + "_track");
+        View fill = new View(a);
+        fill.setTag(TAG + "_fill");
+        fill.setBackgroundColor(FG);
+        track.addView(fill, new LinearLayout.LayoutParams(2, dp(a, 2)));
+        bottom.addView(track, new LinearLayout.LayoutParams(-1, dp(a, 2)));
+
+        bottom.addView(hairline(a));
+
+        FrameLayout.LayoutParams bottomLp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
+        shell.addView(bottom, bottomLp);
+
+        // the middle of the page opens the menu, the sides still turn pages
+        View hot = new View(a);
+        hot.setBackgroundColor(Color.TRANSPARENT);
+        hot.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { openMenu((Activity) v.getContext(), dc); }
+        });
+        FrameLayout.LayoutParams hotLp = new FrameLayout.LayoutParams(dp(a, 110), dp(a, 80), Gravity.CENTER);
+        shell.addView(hot, hotLp);
+
+        return shell;
+    }
+
+    // ---------------------------------------------------------------- iPod chrome
+    // Built in the iOS language: a centred title bar, grouped cards on #1C1C1E,
+    // inset hairlines, grey values, a red tick for the current choice.
+
+    private static final int CARD = Color.parseColor("#1C1C1E");
+    private static final int SEP = Color.parseColor("#38383A");
+    private static final int ITEM_CHEVRON = 0;
+    private static final int ITEM_CHECK = 1;
+    private static final int ITEM_DANGER = 2;
+    private static final int ITEM_PLAIN = 3;
+    private static final int[] SIZES = {14, 17, 20, 22};
+    private static final String[] SIZE_NAMES = {"小", "标准", "大", "大号"};
+    private static final String[] FONT_KEYS = {"", "NotoSansCJK", "NotoSerifCJK", "DroidSansMono"};
+    private static final String[] FONT_NAMES = {"默认", "黑体", "衬线", "等宽"};
+    private static final String[] BRIGHT_NAMES = {"暗", "中", "亮"};
+    private static final float[] BRIGHT_VALUES = {0.35f, 0.6f, 0.95f};
+
+    private static final class Page {
+        final FrameLayout veil;
+        final LinearLayout body;
+
+        Page(FrameLayout veil, LinearLayout body) {
+            this.veil = veil;
+            this.body = body;
+        }
+    }
+
+    private static FrameLayout decor(Activity a) {
+        return a.getWindow().getDecorView() instanceof FrameLayout
+               ? (FrameLayout) a.getWindow().getDecorView() : null;
+    }
+
+    /** A full screen page with an iOS title bar; null backLabel means this is a root page. */
+    private static Page newPage(final Activity a, FrameLayout root, String title, String backLabel,
+                                final Runnable onBack) {
+        final FrameLayout veil = new FrameLayout(a);
+        veil.setTag(TAG + "_menu");
+        veil.setBackgroundColor(Color.BLACK);
+
+        LinearLayout column = new LinearLayout(a);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setBackgroundColor(Color.BLACK);
+        column.addView(navBar(a, title, backLabel, new Runnable() {
+            @Override public void run() {
+                close(veil);
+                if (onBack != null) {
+                    onBack.run();
+                }
+            }
+        }, backLabel == null ? new Runnable() {
+            @Override public void run() { close(veil); }
+        } : null), new LinearLayout.LayoutParams(-1, dp(a, 56)));
+        column.addView(hairline(a));
+
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        sv.setVerticalScrollBarEnabled(false);
+        sv.setFillViewport(true);
+        sv.setBackgroundColor(Color.BLACK);
+        LinearLayout body = new LinearLayout(a);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(a, 16), dp(a, 10), dp(a, 16), dp(a, 36));
+        sv.addView(body, new android.widget.ScrollView.LayoutParams(-1, -2));
+        column.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        veil.addView(column, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(veil, new FrameLayout.LayoutParams(-1, -1));
+        return new Page(veil, body);
+    }
+
+    private static View navBar(Activity a, String title, String backLabel, final Runnable onBack,
+                              final Runnable onDone) {
+        FrameLayout bar = new FrameLayout(a);
+        bar.setBackgroundColor(Color.BLACK);
+
+        TextView center = new TextView(a);
+        center.setText(title);
+        center.setTextColor(FG);
+        center.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        center.setTypeface(Typeface.DEFAULT_BOLD);
+        center.setGravity(Gravity.CENTER);
+        bar.addView(center, new FrameLayout.LayoutParams(-1, -1));
+
+        if (backLabel != null) {
+            TextView back = new TextView(a);
+            back.setText("\u2039 " + backLabel);
+            back.setTextColor(RED);
+            back.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+            back.setGravity(Gravity.CENTER_VERTICAL);
+            back.setPadding(dp(a, 16), 0, dp(a, 16), 0);
+            back.setOnClickListener(new View.OnClickListener()
+            {
+                @Override public void onClick(View v) {
+                    if (onBack != null) {
+                        onBack.run();
+                    }
+                }
+            });
+            bar.addView(back, new FrameLayout.LayoutParams(-2, -1, Gravity.LEFT));
+        }
+
+        if (onDone != null) {
+            TextView done = new TextView(a);
+            done.setText("\u5b8c\u6210");
+            done.setTextColor(RED);
+            done.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+            done.setGravity(Gravity.CENTER_VERTICAL);
+            done.setPadding(dp(a, 16), 0, dp(a, 16), 0);
+            done.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    if (onDone != null) {
+                        onDone.run();
+                    }
+                }
+            });
+            bar.addView(done, new FrameLayout.LayoutParams(-2, -1, Gravity.RIGHT));
+        }
+        return bar;
+    }
+
+    private static void openMenu(final Activity a, final DocumentController dc) {
+        final FrameLayout root = decor(a);
+        if (root == null) {
+            return;
+        }
+        final Page p = newPage(a, root, "阅读", null, null);
+
+        LinearLayout c1 = card(a);
+        addItem(c1, item(a, "目录", null, ITEM_CHEVRON, new Runnable() {
+            @Override public void run() {
+                close(p.veil);
+                click(a, R.id.onDocDontext);
+            }
+        }));
+        addDivider(a, c1);
+        addItem(c1, item(a, "书签", null, ITEM_CHEVRON, new Runnable() {
+            @Override public void run() {
+                close(p.veil);
+                click(a, R.id.onBookmarks);
+            }
+        }));
+        p.body.addView(c1, c1.getLayoutParams());
+
+        p.body.addView(sectionTitle(a, "显示"));
+
+        LinearLayout c2 = card(a);
+        addItem(c2, item(a, "字号", SIZE_NAMES[sizeIndex()], ITEM_CHEVRON, new Runnable() {
+            @Override public void run() {
+                close(p.veil);
+                openSize(a, dc, root);
+            }
+        }));
+        addDivider(a, c2);
+        addItem(c2, item(a, "字体", fontName(), ITEM_CHEVRON, new Runnable() {
+            @Override public void run() {
+                close(p.veil);
+                openFont(a, dc, root);
+            }
+        }));
+        addDivider(a, c2);
+        addItem(c2, item(a, "页面", AppState.get().isDayNotInvert ? "白天" : "夜间", ITEM_CHEVRON, new Runnable() {
+            @Override public void run() {
+                close(p.veil);
+                openPage(a, dc, root);
+            }
+        }));
+        addDivider(a, c2);
+        addItem(c2, item(a, "亮度", BRIGHT_NAMES[brightIndex(a)], ITEM_CHEVRON, new Runnable() {
+            @Override public void run() {
+                close(p.veil);
+                openBright(a, root);
+            }
+        }));
+        p.body.addView(c2, c2.getLayoutParams());
+    }
+
+    private static void openSize(final Activity a, final DocumentController dc, final FrameLayout root) {
+        final Page p = newPage(a, root, "字号", "显示", new Runnable() {
+            @Override public void run() {
+                openMenu(a, dc);
+            }
+        });
+        LinearLayout c = card(a);
+        int cur = sizeIndex();
+        for (int i = 0; i < SIZES.length; i++) {
+            if (i > 0) {
+                addDivider(a, c);
+            }
+            final int sp = SIZES[i];
+            addItem(c, item(a, SIZE_NAMES[i], null, i == cur ? ITEM_CHECK : ITEM_PLAIN, new Runnable() {
+                @Override public void run() {
+                    close(p.veil);
+                    applyFontSize(a, dc, sp);
+                }
+            }));
+        }
+        p.body.addView(c, c.getLayoutParams());
+        p.body.addView(hint(a, "点一下即生效，文字按新字号重新排版。"));
+    }
+
+    private static void openFont(final Activity a, final DocumentController dc, final FrameLayout root) {
+        final Page p = newPage(a, root, "字体", "显示", new Runnable() {
+            @Override public void run() {
+                openMenu(a, dc);
+            }
+        });
+        LinearLayout c = card(a);
+        int cur = fontIndex();
+        for (int i = 0; i < FONT_NAMES.length; i++) {
+            if (i > 0) {
+                addDivider(a, c);
+            }
+            final BookCSS.FontPack pack = fontPack(i);
+            addItem(c, item(a, FONT_NAMES[i], null, i == cur ? ITEM_CHECK : ITEM_PLAIN, new Runnable() {
+                @Override public void run() {
+                    close(p.veil);
+                    applyFont(a, dc, pack);
+                }
+            }));
+        }
+        p.body.addView(c, c.getLayoutParams());
+        p.body.addView(hint(a, "字体来自系统与内置字体包，缺省时只用内置字体。"));
+    }
+
+    private static void openPage(final Activity a, final DocumentController dc, final FrameLayout root) {
+        final Page p = newPage(a, root, "页面", "显示", new Runnable() {
+            @Override public void run() {
+                openMenu(a, dc);
+            }
+        });
+        final boolean day = AppState.get().isDayNotInvert;
+        LinearLayout c = card(a);
+        addItem(c, item(a, "白天", null, day ? ITEM_CHECK : ITEM_PLAIN, new Runnable() {
+            @Override public void run() {
+                close(p.veil);
+                setDay(a, dc, true);
+            }
+        }));
+        addDivider(a, c);
+        addItem(c, item(a, "夜间", null, day ? ITEM_PLAIN : ITEM_CHECK, new Runnable() {
+            @Override public void run() {
+                close(p.veil);
+                setDay(a, dc, false);
+            }
+        }));
+        p.body.addView(c, c.getLayoutParams());
+        p.body.addView(hint(a, "白天是白纸黑字，夜间是黑底白字；顶栏和进度条始终是黑色。"));
+    }
+
+    private static void openBright(final Activity a, final FrameLayout root) {
+        final Page p = newPage(a, root, "亮度", "显示", new Runnable() {
+            @Override public void run() {
+                openMenu(a, null);
+            }
+        });
+        LinearLayout c = card(a);
+        int cur = brightIndex(a);
+        for (int i = 0; i < BRIGHT_NAMES.length; i++) {
+            if (i > 0) {
+                addDivider(a, c);
+            }
+            final float v = BRIGHT_VALUES[i];
+            addItem(c, item(a, BRIGHT_NAMES[i], null, i == cur ? ITEM_CHECK : ITEM_PLAIN, new Runnable() {
+                @Override public void run() {
+                    close(p.veil);
+                    setBrightness(a, v);
+                }
+            }));
+        }
+        p.body.addView(c, c.getLayoutParams());
+        p.body.addView(hint(a, "只调阅读页的屏亮度，不改系统亮度。"));
+    }
+
+    private static void setBrightness(Activity a, float v) {
+        try {
+            WindowManager.LayoutParams lp = a.getWindow().getAttributes();
+            lp.screenBrightness = v;
+            a.getWindow().setAttributes(lp);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static int brightIndex(Activity a) {
+        float cur = a.getWindow().getAttributes().screenBrightness;
+        if (cur < 0) {
+            return BRIGHT_VALUES.length - 1;
+        }
+        int best = 0;
+        float delta = 9f;
+        for (int i = 0; i < BRIGHT_VALUES.length; i++) {
+            float diff = Math.abs(cur - BRIGHT_VALUES[i]);
+            if (diff < delta) {
+                delta = diff;
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    private static int sizeIndex() {
+        int cur = BookCSS.get().fontSizeSp;
+        int best = 1;
+        int delta = 999;
+        for (int i = 0; i < SIZES.length; i++) {
+            int diff = Math.abs(cur - SIZES[i]);
+            if (diff < delta) {
+                delta = diff;
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    private static int fontIndex() {
+        String cur = BookCSS.get().displayFontName;
+        if (cur == null) {
+            return 0;
+        }
+        String lc = cur.toLowerCase();
+        for (int i = FONT_KEYS.length - 1; i > 0; i--) {
+            if (lc.contains(FONT_KEYS[i].toLowerCase())) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    private static String fontName() {
+        return FONT_NAMES[fontIndex()];
+    }
+
+    private static BookCSS.FontPack fontPack(int i) {
+        String key = FONT_KEYS[i];
+        if (key == null || key.isEmpty()) {
+            return new BookCSS.FontPack(BookCSS.CHARIS_SIL);
+        }
+        try {
+            for (BookCSS.FontPack pack : BookCSS.get().getAllFontsPacks()) {
+                if (pack.dispalyName != null && pack.dispalyName.toLowerCase().contains(key.toLowerCase())) {
+                    return pack;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return new BookCSS.FontPack(key.contains("Mono") ? BookCSS.COURIER : key);
+    }
+
+    private static void applyFont(Activity a, DocumentController dc, BookCSS.FontPack pack) {
+        try {
+            BookCSS.get().resetAll(pack);
+            BookCSS.get().save(a);
+        } catch (Throwable ignored) {
+        }
+        DocumentController live = dc != null ? dc : resolveController(a);
+        if (live != null) {
+            try {
+                live.restartWithAnnotationsSaved();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+    /** The page knows its controller even when the activity was not ready during onResume. */
+    private static DocumentController resolveController(Activity a) {
+        if (CONTROLLER != null && CONTROLLER.get() != null) {
+            return CONTROLLER.get();
+        }
+        if (a instanceof com.foobnix.pdf.search.activity.HorizontalViewActivity) {
+            try {
+                return ((com.foobnix.pdf.search.activity.HorizontalViewActivity) a).getPodController();
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static void applyFontSize(Activity a, DocumentController dc, int sp) {
+        BookCSS.get().fontSizeSp = sp;
+        BookCSS.get().fontSizeSpFoliate = sp;
+        try {
+            BookCSS.get().save(a);
+        } catch (Throwable ignored) {
+        }
+        DocumentController live = dc != null ? dc : resolveController(a);
+        android.util.Log.i("PodReader", "font size " + sp + " dc=" + live);
+        if (live != null) {
+            try {
+                live.restartWithAnnotationsSaved();
+            } catch (Throwable t) {
+                android.util.Log.i("PodReader", "font restart failed " + t);
+            }
+        }
+    }
+
+    private static void setDay(Activity a, DocumentController dc, boolean day) {
+        // the reader already owns a day/night switch on its toolbar; it knows how to repaint
+        // the page, save the setting and keep the reading position - so hand it the click
+        View night = a.findViewById(R.id.bookNight);
+        if (night != null && AppState.get().isDayNotInvert != day) {
+            night.performClick();
+            return;
+        }
+        AppState.get().isDayNotInvert = day;
+        try {
+            AppState.get().save(a);
+        } catch (Throwable ignored) {
+        }
+        DocumentController live = dc != null ? dc : resolveController(a);
+        android.util.Log.i("PodReader", "setDay " + day + " dc=" + live);
+        if (live != null) {
+            try {
+                live.restartWithAnnotationsSaved();
+                return;
+            } catch (Throwable t) {
+                android.util.Log.i("PodReader", "setDay restart failed " + t);
+            }
+        }
+        // last resort: the page re-reads the setting only when it is built again
+        try {
+            a.recreate();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void turnPage(Activity a, boolean next) {
+        try {
+            if (a instanceof com.foobnix.pdf.search.activity.HorizontalViewActivity) {
+                if (next) {
+                    ((com.foobnix.pdf.search.activity.HorizontalViewActivity) a).nextPage();
+                } else {
+                    ((com.foobnix.pdf.search.activity.HorizontalViewActivity) a).prevPage();
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void click(Activity a, int id) {
+        View v = a.findViewById(id);
+        if (v != null) {
+            v.performClick();
+        }
+    }
+
+    private static LinearLayout card(Activity a) {
+        LinearLayout c = new LinearLayout(a);
+        c.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(CARD);
+        bg.setCornerRadius(dp(a, 12));
+        c.setBackground(bg);
+        c.setClipToOutline(true);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.topMargin = dp(a, 8);
+        lp.bottomMargin = dp(a, 8);
+        c.setLayoutParams(lp);
+        return c;
+    }
+
+    private static void addItem(LinearLayout card, View v) {
+        card.addView(v, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private static void addDivider(Activity a, LinearLayout card) {
+        View d = new View(a);
+        d.setBackgroundColor(SEP);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(a, 1));
+        lp.leftMargin = dp(a, 16);
+        card.addView(d, lp);
+    }
+
+    private static View sectionTitle(Activity a, String text) {
+        TextView v = new TextView(a);
+        v.setText(text);
+        v.setTextColor(DIM);
+        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        v.setPadding(dp(a, 4), dp(a, 20), dp(a, 4), dp(a, 4));
+        return v;
+    }
+
+    private static View hint(Activity a, String text) {
+        TextView v = new TextView(a);
+        v.setText(text);
+        v.setTextColor(DIM);
+        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        v.setPadding(dp(a, 4), dp(a, 10), dp(a, 4), dp(a, 4));
+        return v;
+    }
+
+    private static View item(Activity a, String label, String value, int kind, final Runnable action) {
+        LinearLayout r = new LinearLayout(a);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setMinimumHeight(dp(a, 48));
+        r.setPadding(dp(a, 16), dp(a, 10), dp(a, 16), dp(a, 10));
+        r.setBackground(selector(a));
+
+        TextView l = new TextView(a);
+        l.setText(label);
+        l.setTextColor(kind == ITEM_DANGER ? RED : FG);
+        l.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        r.addView(l, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        if (value != null && !value.isEmpty()) {
+            TextView val = new TextView(a);
+            val.setText(value);
+            val.setTextColor(DIM);
+            val.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+            val.setPadding(dp(a, 10), 0, 0, 0);
+            r.addView(val, new LinearLayout.LayoutParams(-2, -2));
+        }
+
+        if (kind == ITEM_CHEVRON) {
+            TextView arrow = new TextView(a);
+            arrow.setText("\u203a");
+            arrow.setTextColor(DIM);
+            arrow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+            arrow.setPadding(dp(a, 8), 0, 0, 0);
+            r.addView(arrow, new LinearLayout.LayoutParams(-2, -2));
+        } else if (kind == ITEM_CHECK) {
+            TextView check = new TextView(a);
+            check.setText("\u2713");
+            check.setTextColor(RED);
+            check.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+            check.setTypeface(Typeface.DEFAULT_BOLD);
+            r.addView(check, new LinearLayout.LayoutParams(-2, -2));
+        }
+
+        r.setClickable(true);
+        r.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (action != null) {
+                    action.run();
+                }
+            }
+        });
+        return r;
+    }
+    private static void close(View veil) {
+        ViewGroup parent = (ViewGroup) veil.getParent();
+        if (parent != null) {
+            parent.removeView(veil);
+        }
+    }
+    private static StateListDrawable selector(Activity a) {
+        StateListDrawable sd = new StateListDrawable();
+        sd.addState(new int[]{android.R.attr.state_pressed}, new ColorDrawable(PRESS));
+        sd.addState(new int[]{}, new ColorDrawable(Color.TRANSPARENT));
+        return sd;
+    }
+
+    private static View hairline(Activity a) {
+        View v = new View(a);
+        v.setBackgroundColor(LINE);
+        v.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(a, 1)));
+        return v;
+    }
+
+    private static void hide(Activity a, int[] ids) {
+        for (int id : ids) {
+            View v = a.findViewById(id);
+            if (v != null) {
+                v.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private static int dp(Activity a, int v) {
+        return (int) (v * a.getResources().getDisplayMetrics().density + 0.5f);
+    }
+}

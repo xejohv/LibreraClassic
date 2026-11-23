@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 外壳深褐黑（与香槟金机身搭配） -->
+    <color name="colorPrimary">#C9AE68</color>
+    <color name="colorAccent">#8C8752</color>
+    <color name="colorPrimaryDark">#B3231C10</color>
+
+    <!-- 主强调色：香槟金 -->
+    <color name="main">#8C8752</color>
+    <color name="main_light">#BDB47C</color>
+    <color name="main_dark">#6B6539</color>
+
+    <!-- 选中条目渐变（金色） -->
+    <color name="ipod_selected_top">#4A4022</color>
+    <color name="ipod_selected_bottom">#2A2415</color>
+    <color name="ipod_selected_border">#1C180F</color>
+
+    <!-- 屏幕/列表背景：象牙米白 -->
+    <color name="background_dark_1">#DCC98D</color>
+    <color name="background_dark_2">#C0A961</color>
+    <color name="background">#E8D69C</color>
+    <color name="background_light">#F6EAC0</color>
+
+    <!-- 文字：暖褐黑 -->
+    <color name="text_light">#FFFFFF</color>
+    <color name="text">#2A2415</color>
+    <color name="text_secondary">#5A4C22</color>
+
+    <color name="line">#A08B48</color>
+    <color name="divider_light">#C4AC66</color>
+
+    <color name="battery_green">#9AA35E</color>
+    <color name="battery_red">#B7513C</color>
+    <color name="battery_yellow">#D9B248</color>
+
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="grey">#2B2519</color>
+
+    <!-- 转盘：香槟金盘面 + 深褐圆心 -->
+    <color name="theme_red">#000000</color>
+    <color name="theme_black">#FFFFFF</color>
+    <color name="theme_white">#D6CCA6</color>
+    <color name="theme_gold_inner">#B29B54</color>
+
+
+    <color name="background_1">#87CEFF</color>
+    <color name="background_2">#BFEFFF</color>
+
+    <color name="ball_1">#8C9EFF</color>
+    <color name="ball_2">#304FFE</color>
+
+    <color name="board_1">#363636</color>
+    <color name="board_2">#B5B5B5</color>
+
+    <color name="brick_1">#FF8A80</color>
+    <color name="brick_2">#D50000</color>
+    <color name="brick_3">#FFD180</color>
+    <color name="brick_4">#FF6D00</color>
+    <color name="brick_5">#82B1FF</color>
+    <color name="brick_6">#2962FF</color>
+    <color name="brick_7">#B9F6CA</color>
+    <color name="brick_8">#00C853</color>
+    <color name="brick_9">#EA80FC</color>
+    <color name="brick_10">#AA00FF</color>
+
+</resources>

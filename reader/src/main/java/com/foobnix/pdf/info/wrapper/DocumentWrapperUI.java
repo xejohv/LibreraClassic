@@ -1,0 +1,2862 @@
+/**
+ *
+ */
+package com.foobnix.pdf.info.wrapper;
+
+import androidx.core.content.ContextCompat;
+import android.annotation.TargetApi;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnClickListener;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.MenuItem;
+import android.view.MenuItem.OnMenuItemClickListener;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.View.OnLongClickListener;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver.OnGlobalLayoutListener;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
+
+import androidx.core.graphics.ColorUtils;
+
+import com.foobnix.android.utils.Apps;
+import com.foobnix.android.utils.Dips;
+import com.foobnix.android.utils.IntegerResponse;
+import com.foobnix.android.utils.Keyboards;
+import com.foobnix.android.utils.LOG;
+import com.foobnix.android.utils.TxtUtils;
+import com.foobnix.android.utils.Vibro;
+import com.foobnix.android.utils.Views;
+import com.foobnix.model.AppSP;
+import com.foobnix.model.AppState;
+import com.foobnix.pdf.info.AppsConfig;
+import com.foobnix.pdf.info.BookmarksData;
+import com.foobnix.pdf.info.DictsHelper;
+import com.foobnix.pdf.info.ExtUtils;
+import com.foobnix.pdf.info.OutlineHelper;
+import com.foobnix.pdf.info.OutlineHelper.Info;
+import android.graphics.drawable.ClipDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.graphics.PorterDuffColorFilter;
+import com.foobnix.pdf.info.R;
+import com.foobnix.pdf.info.TintUtil;
+import com.foobnix.pdf.info.UiSystemUtils;
+import com.foobnix.pdf.info.model.OutlineLinkWrapper;
+import com.foobnix.pdf.search.view.SpeedBgView;
+import com.foobnix.pdf.info.view.AlertDialogs;
+import com.foobnix.pdf.info.view.AnchorHelper;
+import com.foobnix.pdf.info.view.LandscapeSplit;
+import com.foobnix.pdf.info.view.BookmarkPanel;
+import com.foobnix.pdf.info.view.BrightnessHelper;
+import com.foobnix.pdf.info.view.CustomSeek;
+import com.foobnix.pdf.info.view.Dialogs;
+import com.foobnix.pdf.info.view.DialogsPlaylist;
+import com.foobnix.pdf.info.view.DragingDialogs;
+import com.foobnix.pdf.info.view.DrawView;
+import com.foobnix.pdf.info.view.HorizontallSeekTouchEventListener;
+import com.foobnix.pdf.info.view.HypenPanelHelper;
+import com.foobnix.pdf.info.view.MyPopupMenu;
+import com.foobnix.pdf.search.menu.MenuBuilderM;
+import com.foobnix.pdf.info.view.ProgressDraw;
+import com.foobnix.pdf.info.view.UnderlineImageView;
+import com.foobnix.pdf.info.widget.DraggbleTouchListener;
+import com.foobnix.pdf.info.widget.ShareDialog;
+import com.foobnix.pdf.search.activity.ViewBinder;
+import com.foobnix.pdf.search.activity.msg.MessagePageXY;
+import com.foobnix.pdf.search.activity.msg.MessegeBrightness;
+import com.foobnix.pdf.search.activity.msg.InvalidateMessage;
+import com.foobnix.pdf.search.activity.msg.MessageEditMark;
+import com.foobnix.pdf.search.activity.msg.NotifyAllFragments;
+import com.foobnix.pdf.search.view.CloseAppDialog;
+import com.foobnix.sys.TempHolder;
+import com.foobnix.tts.MessagePageNumber;
+import com.foobnix.tts.TTSControlsView;
+import com.foobnix.tts.TTSEngine;
+import com.foobnix.tts.TTSService;
+import com.foobnix.tts.TtsStatus;
+import com.foobnix.ui2.AdsFragmentActivity;
+import com.foobnix.ui2.AppDB;
+import com.foobnix.ui2.MainTabs2;
+
+import org.ebookdroid.BookType;
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @author iivanenko
+ */
+public class DocumentWrapperUI {
+
+    final DocumentController dc;
+    final Handler handler = new Handler(Looper.getMainLooper());
+    final Handler handlerTimer = new Handler(Looper.getMainLooper());
+
+    public View.OnClickListener onLockUnlock = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            AppSP.get().isLocked = !AppSP.get().isLocked;
+            updateLock();
+        }
+    };
+    public View.OnClickListener onNextType = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            LOG.d("DEBUG", "Click");
+            doChooseNextType(arg0);
+        }
+    };
+    public View.OnClickListener onSun = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            arg0.setEnabled(false);
+            dc.onNightMode();
+        }
+    };
+    public View.OnClickListener toPage = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            dc.toPageDialog();
+        }
+    };
+    public View.OnClickListener onClose = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            //ImageLoader.getInstance().clearAllTasks();
+            //Glide.with(LibreraApp.context).
+            closeDialogs();
+            closeAndRunList();
+        }
+    };
+    public View.OnClickListener onMoveLeft = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            dc.onSrollLeft();
+        }
+    };
+    public View.OnClickListener onMoveCenter = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            dc.alignDocument();
+        }
+    };
+    public View.OnClickListener onMoveRight = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            dc.onSrollRight();
+        }
+    };
+    public View.OnClickListener onNextPage = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            nextChose(false);
+        }
+    };
+    public View.OnClickListener onPrevPage = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            prevChose(false);
+        }
+    };
+    public View.OnClickListener onPlus = new View.OnClickListener() {
+
+        public void onClick(final View arg0) {
+            dc.onZoomInc();
+        }
+    };
+    public View.OnClickListener onMinus = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            dc.onZoomDec();
+        }
+    };
+    AdsFragmentActivity a;
+    String bookTitle;
+    View showRewardVideo;
+    TextView toastBrightnessText, floatingBookmarkTextView, pagesCountIndicator, currentSeek, maxSeek,
+            currentTime, bookName, nextTypeBootom, batteryLevel, lirbiLogo, reverseKeysIndicator, onSaveAnnotation;
+    public View.OnClickListener onModeChangeClick = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View v) {
+            MyPopupMenu p = new MyPopupMenu(v.getContext(), v);
+
+            p.getMenu()
+             .add(R.string.one_page)
+             .setIcon(R.drawable.my_glyphicons_two_page_one)
+             .setOnMenuItemClickListener(new OnMenuItemClickListener() {
+
+                 @Override
+                 public boolean onMenuItemClick(MenuItem item) {
+                     if (dc.isTextFormat()) {
+                         return false;
+                     }
+                     closeDialogs();
+                     onModeChange.setImageResource(R.drawable.my_glyphicons_two_page_one);
+                     applyCut(false);
+                     return false;
+                 }
+             });
+            if (!dc.isTextFormat()) {
+                addHalfPage(p);
+            }
+            MenuBuilderM.addReadingModes(v, p, dc);
+            p.show();
+            Keyboards.hideNavigation(dc.getActivity());
+
+        }
+
+        private void addHalfPage(MyPopupMenu p) {
+            p.getMenu()
+             .add(R.string.half_page)
+             .setIcon(R.drawable.my_glyphicons_page_split)
+             .setOnMenuItemClickListener(new OnMenuItemClickListener() {
+
+                 @Override
+                 public boolean onMenuItemClick(MenuItem item) {
+                     closeDialogs();
+                     onModeChange.setImageResource(R.drawable.my_glyphicons_page_split);
+                     applyCut(true);
+                     return false;
+                 }
+             });
+        }
+
+        private void applyCut(boolean cut) {
+            if (AppSP.get().isCut == cut) {
+                return;
+            }
+            AppSP.get().isCut = cut;
+            AppSP.get().isCrop = false;
+            AppState.get().cutP = 50;
+            dc.restartWithAnnotationsSaved();
+        }
+    };
+    ImageView onDocDontext, toolBarButton, linkHistory, lockUnlock, lockUnlockTop, textToSpeachTop, clockIcon,
+            batteryIcon, fullscreen, onTextReplacement;
+    ImageView showSearch, nextScreenType, moveCenter, autoScroll, textToSpeach, onModeChange, imageMenuArrow, editTop2,
+            goToPage1, goToPage1Top;
+    View  titleBar, overlay, menuLayout, moveLeft, moveRight, bottomBar, seekLine, onCloseBook, seekSpeedLayot, zoomPlus,
+            zoomMinus;
+    public View.OnLongClickListener onCloseLongClick = new View.OnLongClickListener() {
+
+        @Override
+        public boolean onLongClick(final View v) {
+            Vibro.vibrate();
+            CloseAppDialog.showOnLongClickDialog(a, v, getController());
+            hideAds();
+            return true;
+        }
+    };
+    ImageView pagesBookmark;
+    View line1, line2, lineFirst, lineClose, closeTop, musicButtonPanel, parentParent, documentTitleBar, musicSeekRow, tapZones;
+    ImageView musicClose, musicSettings;
+    SeekBar musicSeekBar;
+    TextView musicCurrent, musicMax;
+    TTSControlsView ttsActive;
+    TTSControlsView ttsActivePage;
+    SeekBar seekBar, speedSeekBar;
+    FrameLayout anchor;
+    public View.OnClickListener onShowContext = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            DragingDialogs.dialogShowContent(anchor, dc);
+        }
+    };
+    public View.OnClickListener onBCclick = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            DragingDialogs.dialogContrastAndBrigtness(anchor, dc, new Runnable() {
+
+                @Override
+                public void run() {
+                    ViewBinder.updateBrightness(onBC);
+                    dc.updateRendering();
+                }
+            }, null);
+        }
+    };
+    ImageView anchorX, anchorY;
+    DrawView drawView;
+    ProgressDraw progressDraw;
+    public View.OnClickListener onHideShowToolBar = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            doHideShowToolBar();
+        }
+    };
+    UnderlineImageView crop, cut, onBC;
+    LinearLayout pageshelper;
+    public View.OnClickListener onShowSearch = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            showSearchDialog();
+        }
+
+    };
+    String quickBookmark;
+    Runnable clearFlags = new Runnable() {
+
+        @Override
+        public void run() {
+            try {
+                dc.getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                LOG.d("FLAG clearFlags", "FLAG_KEEP_SCREEN_ON", "clear");
+            } catch (Exception e) {
+                LOG.e(e);
+            }
+        }
+    };
+    View.OnClickListener onRecent = new View.OnClickListener() {
+
+        @Override
+        public void onClick(View v) {
+            DragingDialogs.dialogRecentBooks(anchor, dc);
+        }
+    };
+    View.OnClickListener onThumbnail = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View v) {
+            DragingDialogs.dialogGoToPage(anchor, dc);
+        }
+    };
+    SeekBar.OnSeekBarChangeListener onSeek = new SeekBar.OnSeekBarChangeListener() {
+
+        @Override
+        public void onStopTrackingTouch(final SeekBar seekBar) {
+            showHideHistory();
+        }
+
+        @Override
+        public void onStartTrackingTouch(final SeekBar seekBar) {
+            // Dragging the slider is not following a link. It used to leave the page behind in
+            // the link history, which raised the back button as though a reference had been
+            // opened; the button is left to mean what it says - back from a link or a footnote.
+        }
+
+        @Override
+        public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser) {
+            if (fromUser) {
+                dc.onGoToPage(progress + 1);
+            }
+            Apps.accessibilityText(a, a.getString(R.string.m_current_page) + " " + dc.getCurentPageFirst1());
+        }
+    };
+    public View.OnClickListener onShowHideEditPanel = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            DragingDialogs.dialogEditColors(anchor, dc, drawView, false, new Runnable() {
+                @Override
+                public void run() {
+                    hideShowAnnotationLine();
+                }
+            });
+        }
+    };
+    SeekBar.OnSeekBarChangeListener onSpeed = new SeekBar.OnSeekBarChangeListener() {
+
+        @Override
+        public void onStopTrackingTouch(final SeekBar seekBar) {
+        }
+
+        @Override
+        public void onStartTrackingTouch(final SeekBar seekBar) {
+        }
+
+        @Override
+        public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser) {
+            AppState.get().autoScrollSpeed = progress + 1;
+            updateSpeedLabel();
+
+            // hideSeekBarInReadMode();
+        }
+    };
+    Runnable hideSeekBar = new Runnable() {
+
+        @Override
+        public void run() {
+            if (!dc.isMusicianMode()) {
+                seekSpeedLayot.setVisibility(View.GONE);
+            }
+
+        }
+    };
+
+    public DocumentWrapperUI(final DocumentController controller) {
+        AppState.get().annotationDrawColor = "";
+        AppState.get().editWith = AppState.EDIT_NONE;
+
+        this.dc = controller;
+        controller.setUi(this);
+
+        EventBus.getDefault().register(this);
+
+    }
+
+    public static boolean isCJK(int ch) {
+        Character.UnicodeBlock block = Character.UnicodeBlock.of(ch);
+        if (Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS.equals(block) || Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS.equals(block) || Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A.equals(block)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onInvalidate(InvalidateMessage event) {
+        dc.redrawPage();
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onEditMark(MessageEditMark edit) {
+        DragingDialogs.dialogEditMark(anchor, dc, updateUIRunnable, edit);
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void updates(NotifyAllFragments notify){
+        DialogsPlaylist.dispalyPlaylist(a, dc);
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onPageNumber(MessagePageNumber event) {
+        try {
+            if (dc != null) {
+                dc.onGoToPage(event.getPage() + 1);
+                showTtsControls();
+            }
+        } catch (Exception e) {
+            LOG.e(e);
+        }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onTTSStatus(TtsStatus status) {
+        try {
+            showTtsControls();
+        } catch (Exception e) {
+            LOG.e(e);
+        }
+
+    }
+
+    public void onSingleTap() {
+        if (dc.isMusicianMode()) {
+            onAutoScrollClick();
+        } else {
+            doShowHideWrapperControlls();
+        }
+    }
+
+    public void onLongPress(MotionEvent ev) {
+        if (dc.isTextFormat() && TxtUtils.isFooterNote(AppState.get().selectedText)) {
+            DragingDialogs.dialogFooterNotes(anchor, dc, new Runnable() {
+
+                @Override
+                public void run() {
+                    showHideHistory();
+                }
+            });
+        } else {
+            if (AppState.get().isRememberDictionary) {
+                DictsHelper.runIntent(dc.getActivity(), anchor, AppState.get().selectedText);
+                dc.clearSelectedText();
+            } else {
+                DragingDialogs.dialogSelectText(anchor, dc, true, updateUIRunnable);
+            }
+        }
+    }
+
+    public void showSelectTextMenu() {
+        DragingDialogs.dialogSelectText(anchor, dc, true, updateUIRunnable);
+
+    }
+
+    Runnable updateTimePower = new Runnable() {
+
+        @Override
+        public void run() {
+            try {
+                if (currentTime != null) {
+                    currentTime.setText(UiSystemUtils.getSystemTime(dc.getActivity()));
+
+                    int myLevel = UiSystemUtils.getPowerLevel(dc.getActivity());
+                    batteryLevel.setText(myLevel + "%");
+                }
+            } catch (Exception e) {
+                LOG.e(e);
+            }
+            LOG.d("Update time and power");
+            handlerTimer.postDelayed(updateTimePower, AppState.APP_UPDATE_TIME_IN_UI);
+
+        }
+    };
+
+    public boolean checkBack(final KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (keyCode == 0) {
+            keyCode = event.getScanCode();
+        }
+
+        if (anchor == null) {
+            closeAndRunList();
+            return true;
+        }
+        if (AppState.get().isAutoScroll) {
+            AppState.get().isAutoScroll = false;
+            updateUI();
+            return true;
+        }
+
+        if (dc.floatingBookmark != null) {
+            dc.floatingBookmark = null;
+            onRefresh.run();
+            return true;
+        }
+
+        if (KeyEvent.KEYCODE_BACK == keyCode) {
+            if (closeDialogs()) {
+                return true;
+            } else if (!dc.getLinkHistory().isEmpty()) {
+                dc.onLinkHistory();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean dispatchKeyEventUp(final KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (keyCode == 0) {
+            keyCode = event.getScanCode();
+        }
+
+        if (KeyEvent.KEYCODE_MENU == keyCode || KeyEvent.KEYCODE_M == keyCode) {
+            doShowHideWrapperControlls();
+            return true;
+        }
+
+        return false;
+
+    }
+
+    public boolean dispatchKeyEventDown(final KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (keyCode == 0) {
+            keyCode = event.getScanCode();
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            return true;
+        }
+
+        if (keyCode >= KeyEvent.KEYCODE_1 && keyCode <= KeyEvent.KEYCODE_9) {
+            dc.onGoToPage(keyCode - KeyEvent.KEYCODE_1 + 1);
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_0) {
+            dc.toPageDialog();
+            return true;
+        }
+
+        if (KeyEvent.KEYCODE_F == keyCode) {
+            dc.alignDocument();
+            return true;
+        }
+        if (KeyEvent.KEYCODE_L == keyCode) {
+            DragingDialogs.dialogRecentBooks(anchor, dc);
+            return true;
+        }
+        if (KeyEvent.KEYCODE_T == keyCode) {
+            DragingDialogs.dialogTextToSpeech(anchor, dc);
+            return true;
+        }
+        if (KeyEvent.KEYCODE_C == keyCode) {
+            DragingDialogs.dialogShowContent(anchor, dc);
+            return true;
+        }
+        if (KeyEvent.KEYCODE_B == keyCode) {
+            DragingDialogs.dialogShowBookmarks(anchor, dc, null);
+            return true;
+        }
+
+        if (KeyEvent.KEYCODE_ENTER == keyCode) {
+            closeDialogs();
+            AppState.get().isEditMode = false;
+            hideShow();
+            if (TTSEngine.get().isTempPausing()) {
+                TTSService.playPause(dc.getActivity(), dc);
+            } else {
+                onAutoScrollClick();
+            }
+            return true;
+        }
+
+        if (KeyEvent.KEYCODE_S == keyCode || KeyEvent.KEYCODE_SEARCH == keyCode) {
+            showSearchDialog();
+            return true;
+        }
+
+        if (KeyEvent.KEYCODE_A == keyCode || KeyEvent.KEYCODE_SPACE == keyCode) {
+            onAutoScrollClick();
+            return true;
+        }
+
+        if (AppState.get().isUseVolumeKeys && AppState.get().isZoomInOutWithVolueKeys) {
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                dc.onZoomInc();
+                return true;
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                dc.onZoomDec();
+                return true;
+            }
+
+        }
+
+        if (AppState.get().isScrollSpeedByVolumeKeys && AppState.get().isUseVolumeKeys && AppState.get().isAutoScroll) {
+            if (KeyEvent.KEYCODE_VOLUME_UP == keyCode) {
+                if (AppState.get().autoScrollSpeed > 1) {
+                    AppState.get().autoScrollSpeed -= 1;
+                    dc.onAutoScroll();
+                    updateUI();
+                }
+                return true;
+            }
+            if (KeyEvent.KEYCODE_VOLUME_DOWN == keyCode) {
+                if (AppState.get().autoScrollSpeed <= AppState.MAX_SPEED) {
+                    AppState.get().autoScrollSpeed += 1;
+                }
+                dc.onAutoScroll();
+                updateUI();
+                return true;
+            }
+        }
+
+        if (!TTSEngine.get().isPlaying()) {
+            if (AppState.get().isUseVolumeKeys && AppState.get().getNextKeys().contains(keyCode)) {
+                if (closeDialogs()) {
+                    return true;
+                }
+                nextChose(false, event.getRepeatCount());
+                return true;
+            }
+
+            if (AppState.get().isUseVolumeKeys && AppState.get().getPrevKeys().contains(keyCode)) {
+                if (closeDialogs()) {
+                    return true;
+                }
+                prevChose(false, event.getRepeatCount());
+                return true;
+            }
+        }
+
+        if (AppState.get().isUseVolumeKeys && KeyEvent.KEYCODE_HEADSETHOOK == keyCode) {
+            if (TTSEngine.get().isPlaying()) {
+                if (AppState.get().isFastBookmarkByTTS) {
+                    TTSEngine.get().fastTTSBookmakr(dc);
+                } else {
+                    TTSEngine.get().stop();
+                }
+            } else {
+                //TTSEngine.get().playCurrent();
+                TTSService.playPause(dc.getActivity(), dc);
+                anchor.setTag("");
+            }
+            //TTSNotification.showLast();
+            //DragingDialogs.textToSpeachDialog(anchor, dc);
+            return true;
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            dc.onScrollDown();
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            dc.onScrollUp();
+            return true;
+        }
+
+        if (keyCode == 70) {
+            dc.onZoomInc();
+            return true;
+        }
+
+        if (keyCode == 69) {
+            dc.onZoomDec();
+            return true;
+        }
+
+//        if (PageImageState.get().hasSelectedWords()) {
+//            dc.clearSelectedText();
+//            return true;
+//        }
+
+        return false;
+
+    }
+
+    public void closeAndRunList() {
+        EventBus.getDefault().unregister(this);
+
+        if (handler != null) {
+            handler.removeCallbacksAndMessages(null);
+        }
+
+        if (titleBar != null) {
+            titleBar.removeCallbacks(null);
+        }
+        dc.saveCurrentPageAsync();
+        dc.onCloseActivityAdnShowInterstial();
+        dc.closeActivity();
+
+    }
+
+    View.OnClickListener onTextToSpeach = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View v) {
+            if (AppSP.get().isCut) {
+                onModeChange.setImageResource(R.drawable.my_glyphicons_two_page_one);
+                onCut.onClick(null);
+                return;
+            }
+            DragingDialogs.dialogTextToSpeech(anchor, dc);
+        }
+    };
+
+    public void updateSpeedLabel() {
+
+        Info info = OutlineHelper.getForamtingInfo(dc, true);
+
+        maxSeek.setText(info.textPage);
+        currentSeek.setText(info.textMax);
+        if (musicMax != null) {
+            musicMax.setText(info.textPage);
+            musicCurrent.setText(info.textMax);
+        }
+        pagesCountIndicator.setText(info.chText);
+
+        currentSeek.setContentDescription(dc.getString(R.string.m_current_page) + " " + info.textMax);
+        maxSeek.setContentDescription(dc.getString(R.string.m_total_pages) + " " + info.textPage);
+    }
+
+    public void updateUI() {
+        //hideShowAnnotationLine();
+        DocumentController.showEngineInDebug((TextView) dc.getActivity().findViewById(R.id.modeName), dc);
+        final int max = dc.getPageCount();
+        final int current = dc.getCurentPage();
+
+        updateSpeedLabel();
+
+        seekBar.setOnSeekBarChangeListener(null);
+        seekBar.setMax(max - 1);
+        seekBar.setProgress(current - 1);
+        seekBar.setOnSeekBarChangeListener(onSeek);
+
+        musicSeekBar.setOnSeekBarChangeListener(null);
+        musicSeekBar.setMax(max - 1);
+        musicSeekBar.setProgress(current - 1);
+        musicSeekBar.setOnSeekBarChangeListener(onSeek);
+
+        speedSeekBar.setOnSeekBarChangeListener(null);
+        speedSeekBar.setMax(AppState.MAX_SPEED);
+        speedSeekBar.setProgress(AppState.get().autoScrollSpeed);
+        speedSeekBar.setOnSeekBarChangeListener(onSpeed);
+
+        // time
+        currentTime.setText(UiSystemUtils.getSystemTime(a));
+
+        final int myLevel = UiSystemUtils.getPowerLevel(a);
+        batteryLevel.setText(myLevel + "%");
+        if (myLevel == -1) {
+            batteryLevel.setVisibility(View.GONE);
+        }
+
+        showChapter();
+
+        hideShow();
+        initNextType();
+        initToolBarPlusMinus();
+
+        showHideHistory();
+
+        updateLock();
+
+        reverseKeysIndicator.setVisibility(AppState.get().isReverseKeys ? View.VISIBLE : View.GONE);
+        if (true || dc.isMusicianMode()) {
+            reverseKeysIndicator.setVisibility(View.GONE);
+        }
+
+        moveLeft.setVisibility(Dips.isVertical() ? View.GONE : View.VISIBLE);
+        moveRight.setVisibility(Dips.isVertical() ? View.GONE : View.VISIBLE);
+        zoomPlus.setVisibility(Dips.isVertical() ? View.GONE : View.VISIBLE);
+        zoomMinus.setVisibility(Dips.isVertical() ? View.GONE : View.VISIBLE);
+
+        ViewBinder.updateBrightness(onBC);
+
+        onTextReplacement.setVisibility(View.GONE);
+        if (dc.isTextFormat()) {
+            moveLeft.setVisibility(View.GONE);
+            moveRight.setVisibility(View.GONE);
+            zoomPlus.setVisibility(View.GONE);
+            zoomMinus.setVisibility(View.GONE);
+            crop.setVisibility(View.GONE);
+            cut.setVisibility(View.GONE);
+            onModeChange.setImageResource(R.drawable.my_glyphicons_two_page_one);
+            onTextReplacement.setVisibility(View.VISIBLE);
+
+            if (AppSP.get().isCrop) {
+                crop.setVisibility(View.VISIBLE);
+            }
+            if (AppSP.get().isCut) {
+                cut.setVisibility(View.VISIBLE);
+            }
+        }
+
+        crop.underline(AppSP.get().isCrop);
+        cut.underline(AppSP.get().isCut);
+
+        progressDraw.updateProgress(current - 1);
+
+        if (AppState.get().inactivityTime > 0) {
+            dc.getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            LOG.d("FLAG addFlags", "FLAG_KEEP_SCREEN_ON", "add", AppState.get().inactivityTime);
+            handler.removeCallbacks(clearFlags);
+            handler.postDelayed(clearFlags, TimeUnit.MINUTES.toMillis(AppState.get().inactivityTime));
+        }
+
+        // The bookmark button stays while the music scrolls: a page is marked as it goes by
+        pagesBookmark.setVisibility(View.VISIBLE);
+
+        dc.saveCurrentPage();
+        //SharedBooks.save(bs);
+
+        LOG.d("dc.floatingBookmark", dc.floatingBookmark);
+        if (dc.floatingBookmark != null) {
+            dc.floatingBookmark.p = dc.getPercentage();
+            floatingBookmarkTextView.setText("{" + dc.getCurentPageFirst1() + "}");
+            floatingBookmarkTextView.setVisibility(View.VISIBLE);
+
+            BookmarksData.get().add(dc.floatingBookmark);
+            showPagesHelper();
+        } else {
+            floatingBookmarkTextView.setVisibility(View.GONE);
+        }
+
+        try {
+            if (!dc.isTextFormat()) {
+                TempHolder.get().documentTitleBarHeight = documentTitleBar.getHeight();
+            } else {
+                TempHolder.get().documentTitleBarHeight = 0;
+            }
+        } catch (Exception e) {
+            TempHolder.get().documentTitleBarHeight = 0;
+        }
+
+        layoutTapZones();
+        // Out of sight while the music scrolls or while it is paused, as asked, or always, though
+        // a tap on one still turns the page
+        final boolean zonesHidden = !AppState.get().isShowRectangularTapZones
+                || (AppState.get().isAutoScroll ? !AppState.get().isShowMusicTapZonesScrolling
+                : !AppState.get().isShowMusicTapZonesPaused);
+        fadeTo(line1, zonesHidden ? 0f : 1f);
+        fadeTo(line2, zonesHidden ? 0f : 1f);
+
+    }
+
+    public void hideShowPrevNext() {
+        // Musician's tap zones are always there to tap, seen or not: updateUI shows or hides them
+        if (dc.isMusicianMode()) {
+            line1.setVisibility(View.VISIBLE);
+            line2.setVisibility(View.VISIBLE);
+        }
+    }
+
+    public void showChapter() {
+
+        if (AppState.get().isShowPanelBookNameScrollMode) {
+//            if (TxtUtils.isNotEmpty(dc.getCurrentChapter())) {
+//                bookName.setText(bookTitle + " " + TxtUtils.LONG_DASH1 + " " + dc.getCurrentChapter().trim());
+//                LOG.d("bookName.setText(1)", bookTitle);
+//            } else {
+//                bookName.setText(bookTitle);
+//                LOG.d("bookName.setText(2)", bookTitle);
+//            }
+            bookName.setText(bookTitle);
+            bookName.setVisibility(View.VISIBLE);
+            pagesCountIndicator.setGravity(Gravity.RIGHT);
+            //bookName.setVisibility(View.VISIBLE);
+            ((LinearLayout.LayoutParams) pagesCountIndicator.getLayoutParams()).weight = 0;
+        } else {
+            pagesCountIndicator.setGravity(Gravity.LEFT);
+            ((LinearLayout.LayoutParams) pagesCountIndicator.getLayoutParams()).weight = 1;
+            //bookName.setVisibility(View.GONE);
+            bookName.setText("");
+            bookName.setVisibility(View.GONE);
+        }
+
+    }
+
+    public void updateLock() {
+        // int mode = View.VISIBLE;
+
+        if (AppSP.get().isLocked) {
+            lockUnlock.setImageResource(R.drawable.glyphicons_217_lock);
+            lockUnlockTop.setImageResource(R.drawable.glyphicons_217_lock);
+            // lockUnlock.setColorFilter(a.getResources().getColor(R.color.tint_yellow));
+            // lockUnlockTop.setColorFilter(a.getResources().getColor(R.color.tint_yellow));
+            // mode = View.VISIBLE;
+        } else {
+            lockUnlock.setImageResource(R.drawable.glyphicons_218_lock_open);
+            lockUnlockTop.setImageResource(R.drawable.glyphicons_218_lock_open);
+            // lockUnlock.setColorFilter(a.getResources().getColor(R.color.tint_white));
+            // lockUnlockTop.setColorFilter(a.getResources().getColor(R.color.tint_white));
+            // mode = View.GONE;
+        }
+        //TxtUtils.updateAllLinks(parentParent);
+//        if (AppState.get().l) {
+//            TintUtil.setTintImageWithAlpha(moveCenter, Color.LTGRAY);
+//        } else {
+//            TintUtil.setTintImageWithAlpha(moveCenter, Color.WHITE);
+//        }
+
+    }
+
+    /**
+     * The button that closes the recent panel. It is kept out of the way while a book loads -
+     * the panel is what the reader is waiting on, and closing it there would leave them
+     * looking at a blank page - and put back afterwards only if the panel is open at all.
+     */
+    public void showPlaylistClose(boolean show) {
+        View closePlaylist = a.findViewById(R.id.closePlaylist);
+        if (closePlaylist == null) {
+            return;
+        }
+        // The recent panel has no close of its own any more: the button ahead of its tabs puts it away
+        closePlaylist.setVisibility(View.GONE);
+    }
+
+    public void showHideHistory() {
+        linkHistory.setVisibility(dc.getLinkHistory().isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    @Subscribe
+    public void showHideTextSelectors(MessagePageXY event) {
+        if (event.getType() == MessagePageXY.TYPE_HIDE) {
+            anchorX.setVisibility(View.GONE);
+            anchorY.setVisibility(View.GONE);
+
+        }
+        if (event.getType() == MessagePageXY.TYPE_SHOW) {
+            anchorX.setVisibility(View.VISIBLE);
+            anchorY.setVisibility(View.VISIBLE);
+
+            AnchorHelper.setXY(anchorX, event.getX(), event.getY());
+            AnchorHelper.setXY(anchorY, event.getX1(), event.getY1());
+
+        }
+
+    }
+
+    Runnable onRefresh = new Runnable() {
+
+        @Override
+        public void run() {
+            dc.saveCurrentPageAsync();
+            initToolBarPlusMinus();
+            updateSeekBarColorAndSize();
+            hideShow();
+            updateUI();
+            TTSEngine.get().stop();
+            BrightnessHelper.updateOverlay(overlay);
+            showPagesHelper();
+            hideShowPrevNext();
+        }
+    };
+
+    public void initUI(final AdsFragmentActivity a) {
+        this.a = a;
+        quickBookmark = a.getString(R.string.fast_bookmark);
+
+        a.findViewById(R.id.showHypenLangPanel).setVisibility(View.GONE);
+
+        parentParent = a.findViewById(R.id.parentParent);
+        documentTitleBar = a.findViewById(R.id.document_title_bar);
+        linkHistory = (ImageView) a.findViewById(R.id.linkHistory);
+        linkHistory.setOnClickListener(onLinkHistory);
+        // A long press forgets the way back: the pages stay where they are, the button goes
+        linkHistory.setOnLongClickListener(v -> {
+            dc.getLinkHistory().clear();
+            showHideHistory();
+            return true;
+        });
+
+        menuLayout = a.findViewById(R.id.menuLayout);
+
+        bottomBar = a.findViewById(R.id.bottomBar);
+        imageMenuArrow = (ImageView) a.findViewById(R.id.imageMenuArrow);
+
+        seekBar = (SeekBar) a.findViewById(R.id.seekBar1);
+        seekBar.setAccessibilityDelegate(new View.AccessibilityDelegate());
+        speedSeekBar = (SeekBar) a.findViewById(R.id.seekBarSpeed);
+        seekSpeedLayot = a.findViewById(R.id.seekSpeedLayot);
+        anchor = (FrameLayout) a.findViewById(R.id.anchor);
+
+        anchorX = (ImageView) a.findViewById(R.id.anchorX);
+        anchorY = (ImageView) a.findViewById(R.id.anchorY);
+
+        floatingBookmarkTextView = a.findViewById(R.id.floatingBookmark);
+        floatingBookmarkTextView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dc.floatingBookmark = null;
+                onRefresh.run();
+                onBookmarks.onClick(v);
+            }
+        });
+        floatingBookmarkTextView.setOnLongClickListener(new OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                dc.floatingBookmark = null;
+                onRefresh.run();
+                return true;
+            }
+        });
+
+        TintUtil.setTintImageWithAlpha(anchorX, AppState.get().isDayNotInvert ? Color.BLUE : Color.YELLOW, 150);
+        TintUtil.setTintImageWithAlpha(anchorY, AppState.get().isDayNotInvert ? Color.BLUE : Color.YELLOW, 150);
+
+        anchorX.setVisibility(View.GONE);
+        anchorY.setVisibility(View.GONE);
+
+        DraggbleTouchListener touch1 = new DraggbleTouchListener(anchorX, (View) anchorX.getParent());
+        DraggbleTouchListener touch2 = new DraggbleTouchListener(anchorY, (View) anchorY.getParent());
+
+        final Runnable onMoveActionOnce = new Runnable() {
+
+            @Override
+            public void run() {
+                float x = anchorX.getX() + anchorX.getWidth();
+                float y = anchorX.getY() + anchorX.getHeight() / 2;
+
+                float x1 = anchorY.getX();
+                float y1 = anchorY.getY();
+                EventBus.getDefault()
+                        .post(new MessagePageXY(MessagePageXY.TYPE_SELECT_TEXT, dc.getCurentPage(), x, y, x1, y1));
+            }
+        };
+        final Runnable onMoveAction = new Runnable() {
+
+            @Override
+            public void run() {
+                handler.removeCallbacks(onMoveActionOnce);
+                handler.postDelayed(onMoveActionOnce, 150);
+
+            }
+        };
+
+        Runnable onMoveFinish = new Runnable() {
+
+            @Override
+            public void run() {
+                onMoveAction.run();
+                if (AppState.get().isRememberDictionary) {
+                    final String text = AppState.get().selectedText;
+                    DictsHelper.runIntent(dc.getActivity(), anchor, text);
+                    dc.clearSelectedText();
+
+                } else {
+                    DragingDialogs.dialogSelectText(anchor, dc, true, updateUIRunnable);
+                }
+
+            }
+        };
+
+        touch1.setOnMoveFinish(onMoveFinish);
+        touch2.setOnMoveFinish(onMoveFinish);
+
+        touch1.setOnMove(onMoveAction);
+        touch2.setOnMove(onMoveAction);
+
+        titleBar = a.findViewById(R.id.titleBar);
+        titleBar.setOnClickListener(onMenu);
+
+        overlay = a.findViewById(R.id.overlay);
+        overlay.setVisibility(View.VISIBLE);
+
+        reverseKeysIndicator = (TextView) a.findViewById(R.id.reverseKeysIndicator);
+        // reverseKeysIndicator.setOnClickListener(onReverseKeys);
+
+        zoomPlus = a.findViewById(R.id.zoomPlus);
+        zoomPlus.setOnClickListener(onPlus);
+
+        zoomMinus = a.findViewById(R.id.zoomMinus);
+        zoomMinus.setOnClickListener(onMinus);
+
+        tapZones = a.findViewById(R.id.tapZones);
+        // Turned, the zones the screen keeps for the other way are put in place
+        tapZones.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (r - l > 0 && b - t > 0 && (r - l > b - t) != tapZonesLandscape) {
+                layoutTapZones();
+            }
+        });
+        line1 = a.findViewById(R.id.line1);
+        line1.setOnClickListener(onPrevPage);
+        line1.setOnTouchListener(new TapZoneDrag());
+
+        line2 = a.findViewById(R.id.line2);
+        line2.setOnClickListener(onNextPage);
+        line2.setOnTouchListener(new TapZoneDrag());
+
+        lineClose = a.findViewById(R.id.lineClose);
+        lineClose.setOnClickListener(onClose);
+
+        closeTop = a.findViewById(R.id.closeTop);
+        closeTop.setOnClickListener(onClose);
+        closeTop.setOnLongClickListener(onCloseLongClick);
+        musicSeekRow = a.findViewById(R.id.musicSeekRow);
+        musicSeekBar = a.findViewById(R.id.musicSeekBar);
+        musicCurrent = a.findViewById(R.id.musicCurrent);
+        musicMax = a.findViewById(R.id.musicMax);
+        musicClose = a.findViewById(R.id.musicClose);
+        musicClose.setOnClickListener(onClose);
+        musicClose.setOnLongClickListener(onCloseLongClick);
+        musicSettings = a.findViewById(R.id.musicSettings);
+        musicSettings.setOnClickListener(v -> DragingDialogs.dialogMusicianSettings(anchor, dc, onRefresh));
+
+        lineFirst = a.findViewById(R.id.lineFirst);
+        lineFirst.setOnClickListener(onGoToPAge1);
+
+        onSaveAnnotation = (TextView) a.findViewById(R.id.onSaveAnnotation);
+
+        lirbiLogo = (TextView) a.findViewById(R.id.lirbiLogo);
+        lirbiLogo.setText(AppState.get().musicText);
+        lirbiLogo.setOnClickListener(onLirbiLogoClick);
+
+        editTop2 = (ImageView) a.findViewById(R.id.editTop2);
+        editTop2.setOnClickListener(onShowHideEditPanel);
+
+        goToPage1 = (ImageView) a.findViewById(R.id.goToPage1);
+        goToPage1Top = (ImageView) a.findViewById(R.id.goToPage1Top);
+        goToPage1.setOnClickListener(onGoToPAge1);
+        goToPage1Top.setOnClickListener(onGoToPAge1);
+
+        toolBarButton = (ImageView) a.findViewById(R.id.imageToolbar);
+        toolBarButton.setOnClickListener(onHideShowToolBar);
+
+        // nextPage.setOnClickListener(onNextPage);
+        // prevPage.setOnClickListener(onPrevPage);
+
+        moveLeft = a.findViewById(R.id.moveLeft);
+        moveLeft.setOnClickListener(onMoveLeft);
+
+        moveCenter = a.findViewById(R.id.moveCenter);
+        moveCenter.setOnClickListener(onMoveCenter);
+
+        moveRight = a.findViewById(R.id.moveRight);
+        moveRight.setOnClickListener(onMoveRight);
+
+        ImageView brightness = (ImageView) a.findViewById(R.id.brightness);
+        brightness.setOnClickListener(onSun);
+        brightness.setImageResource(!AppState.get().isDayNotInvert ? R.drawable.glyphicons_232_sun : R.drawable.glyphicons_231_moon);
+
+        // if (Dips.isEInk(dc.getActivity())) {
+        // brightness.setVisibility(View.GONE);
+        // AppState.get().isDayNotInvert = true;
+        // }
+
+        onBC = (UnderlineImageView) a.findViewById(R.id.onBC);
+        onBC.setOnClickListener(onBCclick);
+
+
+        a.findViewById(R.id.toPage).setOnClickListener(toPage);
+
+        crop = (UnderlineImageView) a.findViewById(R.id.crop);
+        crop.setOnClickListener(onCrop);
+        crop.setOnLongClickListener(onCropLong);
+
+        if (AppSP.get().isCut) {
+            crop.setVisibility(View.GONE);
+        }
+
+        cut = (UnderlineImageView) a.findViewById(R.id.cut);
+        cut.setOnClickListener(onCut);
+        cut.setVisibility(View.GONE);
+
+        onModeChange = (ImageView) a.findViewById(R.id.onModeChange);
+        onModeChange.setOnClickListener(onModeChangeClick);
+        onModeChange.setImageResource(AppSP.get().isCut ? R.drawable.my_glyphicons_page_split : R.drawable.my_glyphicons_two_page_one);
+
+        View prefTop = a.findViewById(R.id.prefTop);
+        prefTop.setOnClickListener(onPrefTop);
+
+        fullscreen = (ImageView) a.findViewById(R.id.fullscreen);
+
+        fullscreen.setOnClickListener(onFull);
+        fullscreen.setOnLongClickListener(onFullLong);
+        fullscreen.setImageResource(DocumentController.getFullScreenIcon(a, AppState.get().fullScreenMode));
+
+        onTextReplacement = a.findViewById(R.id.onTextReplacement);
+        onTextReplacement.setOnClickListener(v -> DragingDialogs.dialogTextReplaces(anchor, dc));
+
+        View onLibrary = a.findViewById(R.id.onLibrary);
+        if (onLibrary != null) {
+            TintUtil.setRingColor(onLibrary, MagicHelper.getTextOrIconColor());
+            onLibrary.setOnClickListener(v -> {
+                // Close the book and come back to the library, landing on the same tab the nav
+                // bar's Library opens. The page is saved first, as a normal close does.
+                dc.saveCurrentPageAsync();
+                MainTabs2.startActivity(a, UITab.getCurrentTabIndex(UITab.SearchFragment));
+                dc.closeActivity();
+            });
+        }
+
+        onCloseBook = a.findViewById(R.id.close);
+        Apps.accessibilityButtonSize(onCloseBook);
+        // The ring is drawn in whatever colour the marks along the bar are, so the button
+        // reads as one of them instead of a white circle laid over them.
+        TintUtil.setRingColor(onCloseBook, MagicHelper.getTextOrIconColor());
+
+        onCloseBook.setOnClickListener(onClose);
+        onCloseBook.setOnLongClickListener(onCloseLongClick);
+        onCloseBook.setVisibility(View.INVISIBLE);
+
+        showSearch = (ImageView) a.findViewById(R.id.onShowSearch);
+        showSearch.setOnClickListener(onShowSearch);
+        autoScroll = ((ImageView) a.findViewById(R.id.autoScroll));
+        autoScroll.setOnClickListener(onAutoScroll);
+
+        // ((View)
+        // a.findViewById(R.id.onScreenMode)).setOnClickListener(onScreenMode);
+
+        nextTypeBootom = (TextView) a.findViewById(R.id.nextTypeBootom);
+        // The ring around the word is drawn in the colour the word itself is, so the button
+        // reads as one mark rather than a grey box with a coloured label inside it.
+        TintUtil.setRingColor(nextTypeBootom, MagicHelper.getTextOrIconColor());
+
+        nextTypeBootom.setOnClickListener(onNextType);
+
+        nextScreenType = ((ImageView) a.findViewById(R.id.imageNextScreen));
+        nextScreenType.setOnClickListener(onNextType);
+
+        onDocDontext = (ImageView) a.findViewById(R.id.onDocDontext);
+        onDocDontext.setOnClickListener(onShowContext);
+
+        lockUnlock = (ImageView) a.findViewById(R.id.lockUnlock);
+        lockUnlockTop = (ImageView) a.findViewById(R.id.lockUnlockTop);
+        lockUnlock.setOnClickListener(onLockUnlock);
+        lockUnlockTop.setOnClickListener(onLockUnlock);
+
+        textToSpeachTop = (ImageView) a.findViewById(R.id.textToSpeachTop);
+        textToSpeachTop.setOnClickListener(onTextToSpeach);
+
+        ttsActive = a.findViewById(R.id.ttsActive);
+        ttsActive.setDC(dc);
+        ttsActive.hideStop();
+        moveTtsControlsIntoPanel();
+        // Turned on its side the bottom panel stands its rows side by side
+        LandscapeSplit.footer(a);
+        // The panel over the loading book as it will stand once the book is up
+        DialogsPlaylist.preparePanel(a);
+        ttsActivePage = a.findViewById(R.id.ttsActivePage);
+        ttsActivePage.setDC(dc);
+        ttsActivePage.onPage();
+        // Back on the page being read, the panels make way for it
+        ttsActive.setOnCurrentPage(() -> {
+            if (AppState.get().isEditMode) {
+                doShowHideWrapperControlls();
+            }
+        });
+        ttsActive.addOnDialogRunnable(new Runnable() {
+
+            @Override
+            public void run() {
+                AppState.get().isEditMode = true;
+                hideShow();
+                DragingDialogs.dialogTextToSpeech(anchor, dc);
+            }
+        });
+
+        batteryIcon = (ImageView) a.findViewById(R.id.batteryIcon);
+        clockIcon = (ImageView) a.findViewById(R.id.clockIcon);
+
+        textToSpeach = (ImageView) a.findViewById(R.id.textToSpeach);
+        textToSpeach.setOnClickListener(onTextToSpeach);
+        textToSpeach.setOnLongClickListener(v -> {
+            AlertDialogs.showTTSDebug(dc);
+            hideShow();
+            return true;
+        });
+
+        drawView = (DrawView) a.findViewById(R.id.drawView);
+
+        View bookmarks = a.findViewById(R.id.onBookmarks);
+        bookmarks.setOnClickListener(onBookmarks);
+        bookmarks.setOnLongClickListener(onBookmarksLong);
+
+        showRewardVideo = ViewBinder.initRewardButton(a, R.id.showRewardVideo);
+
+        toastBrightnessText = (TextView) a.findViewById(R.id.toastBrightnessText);
+        toastBrightnessText.setVisibility(View.GONE);
+        TintUtil.setDrawableTint(toastBrightnessText.getCompoundDrawables()[0], Color.WHITE);
+
+        TextView modeName = (TextView) a.findViewById(R.id.modeName);
+
+        if (AppState.get().isEnableAccessibility) {
+            modeName.setText(AppState.get().nameVerticalMode + " (" + dc.getString(R.string.accessibility) + ")");
+        } else {
+            modeName.setText(AppState.get().nameVerticalMode);
+        }
+
+        pagesCountIndicator = (TextView) a.findViewById(R.id.currentPageIndex);
+        pagesCountIndicator.setVisibility(View.GONE);
+
+        currentSeek = (TextView) a.findViewById(R.id.currentSeek);
+        seekLine = a.findViewById(R.id.seekLine);
+        maxSeek = (TextView) a.findViewById(R.id.maxSeek);
+        bookName = (TextView) a.findViewById(R.id.bookName);
+
+        currentTime = (TextView) a.findViewById(R.id.currentTime);
+        batteryLevel = (TextView) a.findViewById(R.id.currentBattery);
+        batteryLevel.setOnClickListener(onHideShowToolBar);
+
+        currentSeek.setOnLongClickListener(new OnLongClickListener() {
+
+            @Override
+            public boolean onLongClick(View v) {
+                Dialogs.showDeltaPage(anchor, dc, dc.getCurentPageFirst1(), updateUIRunnable);
+                return true;
+            }
+        });
+        maxSeek.setOnLongClickListener(new OnLongClickListener() {
+
+            @Override
+            public boolean onLongClick(View v) {
+                Dialogs.showDeltaPage(anchor, dc, dc.getCurentPageFirst1(), updateUIRunnable);
+                return true;
+            }
+        });
+
+        View thumbnail = a.findViewById(R.id.thumbnail);
+        thumbnail.setOnClickListener(onThumbnail);
+
+        View bookMenu = a.findViewById(R.id.bookMenu);
+        bookMenu.setOnClickListener(onItemMenu);
+        modeName.setOnClickListener(v -> ExtUtils.switchReadingMode(a, dc));
+        modeName.setOnLongClickListener(onCloseLongClick);
+//        modeName.setOnLongClickListener(new OnLongClickListener() {
+//
+//            @Override
+//            public boolean onLongClick(View v) {
+//                dc.onChangeTextSelection();
+//                AppState.get().isEditMode = false;
+//                hideShow();
+//                return true;
+//            }
+//        });
+
+        progressDraw = (ProgressDraw) a.findViewById(R.id.progressDraw);
+
+        AppState.get().isAutoScroll = false;
+
+        ImageView recent = (ImageView) a.findViewById(R.id.onRecent);
+        recent.setOnClickListener(onRecent);
+
+        anchor.getViewTreeObserver().addOnGlobalLayoutListener(new OnGlobalLayoutListener() {
+
+            @Override
+            public void onGlobalLayout() {
+                if (anchor.getX() < 0) {
+                    anchor.setX(0);
+                }
+                if (anchor.getY() < 0) {
+                    anchor.setY(0);
+                }
+            }
+
+        });
+        updateSeekBarColorAndSize();
+        BrightnessHelper.updateOverlay(overlay);
+
+        TintUtil.setReaderBar(a.findViewById(R.id.menuLayout), AppState.get().transparencyUI, true);
+        TintUtil.setReaderBar(a.findViewById(R.id.bottomBar1), AppState.get().transparencyUI, false);
+        DocumentController.repaintBarStrips(a);
+        // The name of the mode is set in the colour the book's own title beside it is, rather
+        // than in a white of its own.
+        paintMusicButtons();
+        // The close and settings buttons are circles as tall as the mode's name beside them
+        lirbiLogo.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            final int size = b - t;
+            for (final View round : new View[]{musicClose, musicSettings}) {
+                final ViewGroup.LayoutParams lp = round.getLayoutParams();
+                if (size > 0 && (lp.width != size || lp.height != size)) {
+                    lp.width = lp.height = size;
+                    round.post(() -> round.setLayoutParams(lp));
+                }
+            }
+            // The slider between them as tall as well
+            final ViewGroup.LayoutParams row = musicSeekRow.getLayoutParams();
+            if (size > 0 && row.height != size) {
+                row.height = size;
+                musicSeekRow.post(() -> musicSeekRow.setLayoutParams(row));
+            }
+        });
+        tintSpeed();
+
+        pageshelper = (LinearLayout) a.findViewById(R.id.pageshelper);
+        musicButtonPanel = a.findViewById(R.id.musicButtonPanel);
+        musicButtonPanel.setVisibility(View.GONE);
+
+        pagesBookmark = a.findViewById(R.id.pagesBookmark);
+        pagesBookmark.setOnClickListener(onBookmarks);
+        pagesBookmark.setOnLongClickListener(onBookmarksLong);
+
+        line1.setVisibility(View.GONE);
+        line2.setVisibility(View.GONE);
+        lineFirst.setVisibility(View.GONE);
+        lineClose.setVisibility(View.GONE);
+        goToPage1.setVisibility(View.GONE);
+        goToPage1Top.setVisibility(View.GONE);
+        closeTop.setVisibility(View.GONE);
+
+        textToSpeachTop.setVisibility(View.GONE);
+        lockUnlockTop.setVisibility(View.GONE);
+        nextScreenType.setVisibility(View.GONE);
+        goToPage1Top.setVisibility(View.GONE);
+
+        if (dc.isMusicianMode()) {
+            AppState.get().isEditMode = false;
+            line1.setVisibility(View.VISIBLE);
+            line2.setVisibility(View.VISIBLE);
+            lineFirst.setVisibility(View.VISIBLE);
+            lineClose.setVisibility(View.VISIBLE);
+
+            // The title bar's own buttons are left out: the panels under it carry the same
+            goToPage1.setVisibility(View.VISIBLE);
+
+            reverseKeysIndicator.setVisibility(View.GONE);
+            textToSpeachTop.setVisibility(View.GONE);
+            progressDraw.setVisibility(View.GONE);
+
+            if (AppState.get().isEnableAccessibility) {
+                modeName.setText(AppState.get().nameMusicianMode + " (" + dc.getString(R.string.accessibility) + ")");
+            } else {
+                modeName.setText(AppState.get().nameMusicianMode);
+            }
+        }
+
+        // Mark the reading direction the way HorizontalViewActivity.applyRTL() does, so the
+        // scroll mode shows the same indicator. The seek bar is deliberately not rotated here:
+        // unlike the book mode it tracks top-to-bottom progress, which RTL does not reverse.
+        if (AppSP.get().isRTL) {
+            modeName.setText(modeName.getText() + " RTL");
+        }
+
+        currentSeek.setVisibility(View.GONE);
+        maxSeek.setVisibility(View.GONE);
+        seekBar.setVisibility(View.INVISIBLE);
+
+        hideShowPrevNext();
+        dc.initAnchor(anchor);
+        TxtUtils.updateAllLinks(parentParent);
+    }
+
+    public void updateSeekBarColorAndSize() {
+        lirbiLogo.setText(AppState.get().musicText);
+        // TintUtil.setBackgroundFillColorBottomRight(ttsActive,
+        // ColorUtils.setAlphaComponent(TintUtil.color, 230));
+
+        // The title bar stands on the panels' colour: left at its grey default, it is written in
+        // the panels' own text colour; a colour chosen in the status bar settings is kept
+        int textColor = TintUtil.getStatusBarTextColor();
+        if (textColor == Color.parseColor(AppState.TEXT_COLOR_DAY) || textColor == Color.parseColor(AppState.TEXT_COLOR_NIGHT)) {
+            textColor = MagicHelper.getTextOrIconColor();
+        }
+
+        TintUtil.setTintText(bookName, textColor);
+        TintUtil.setTintImageWithAlpha(textToSpeachTop, textColor);
+        TintUtil.setTintImageWithAlpha(lockUnlockTop, textColor);
+        TintUtil.setTintImageWithAlpha(nextScreenType, textColor);
+        TintUtil.setTintText(pagesCountIndicator, textColor);
+        TintUtil.setTintText(currentTime, textColor);
+        TintUtil.setTintText(batteryLevel, textColor);
+        TintUtil.setTintText(reverseKeysIndicator, ColorUtils.setAlphaComponent(textColor, 200));
+
+        TintUtil.setTintImageWithAlpha(goToPage1Top, textColor);
+        TintUtil.setTintImageWithAlpha((ImageView) closeTop, textColor);
+        TintUtil.setTintImageWithAlpha(toolBarButton, textColor);
+        TintUtil.setTintImageWithAlpha(clockIcon, textColor).setImageAlpha(200);
+        TintUtil.setTintImageWithAlpha(batteryIcon, textColor).setImageAlpha(200);
+
+        //int titleColor = AppState.get().isDayNotInvert ? MagicHelper.otherColor(AppState.get().colorDayBg, -0.05f) : MagicHelper.otherColor(AppState.get().colorNigthBg, 0.05f);
+        // The row the title bar stands in is painted instead, status bar strip and all
+        titleBar.setBackgroundColor(Color.TRANSPARENT);
+        TintUtil.setReaderBar(a.findViewById(R.id.menuLayout), AppState.get().transparencyUI, true);
+        TintUtil.setReaderBar(a.findViewById(R.id.bottomBar1), AppState.get().transparencyUI, false);
+        DocumentController.repaintBarStrips(a);
+        paintMusicButtons();
+
+        int progressColor = TintUtil.color;
+
+        //progressDraw.setBackgroundColor(TintUtil.color);
+        progressDraw.updateColor(progressColor);
+        progressDraw.getLayoutParams().height = Dips.dpToPx(AppState.get().progressLineHeight);
+        progressDraw.requestLayout();
+
+        // textSize
+        final int titleTextSize = dc.isMusicianMode() ? AppState.get().statusBarTextSizeMusician : AppState.get().statusBarTextSizeAdv;
+        bookName.setTextSize(titleTextSize);
+        pagesCountIndicator.setTextSize(titleTextSize);
+        currentTime.setTextSize(titleTextSize);
+        batteryLevel.setTextSize(titleTextSize);
+        reverseKeysIndicator.setTextSize(titleTextSize);
+        lirbiLogo.setTextSize(titleTextSize);
+        // Musician's name button, and the round buttons and slider that take its height, in
+        // the size chosen for them
+        if (dc.isMusicianMode()) {
+            final float scale = musicButtonScale();
+            lirbiLogo.setTextSize(titleTextSize * scale);
+            lirbiLogo.getLayoutParams().height = Dips.dpToPx(Math.round(32 * scale));
+            final int side = Dips.dpToPx(Math.round(16 * scale));
+            lirbiLogo.setPadding(side, 0, side, 0);
+            final int inner = Dips.dpToPx(Math.round(7 * scale));
+            musicSettings.setPadding(inner, inner, inner, inner);
+            final int close = Dips.dpToPx(Math.round(8 * scale));
+            musicClose.setPadding(close, close, close, close);
+            lirbiLogo.requestLayout();
+        }
+
+        int iconSize = Dips.spToPx(titleTextSize);
+
+        textToSpeachTop.getLayoutParams().height = textToSpeachTop.getLayoutParams().width = iconSize;
+        lockUnlockTop.getLayoutParams().height = lockUnlockTop.getLayoutParams().width = iconSize;
+        nextScreenType.getLayoutParams().height = nextScreenType.getLayoutParams().width = iconSize;
+        goToPage1Top.getLayoutParams().height = goToPage1Top.getLayoutParams().width = iconSize;
+        closeTop.getLayoutParams().height = closeTop.getLayoutParams().width = iconSize;
+        toolBarButton.getLayoutParams().height = toolBarButton.getLayoutParams().width = iconSize;
+
+        clockIcon.getLayoutParams().height = clockIcon.getLayoutParams().width = iconSize;
+        batteryIcon.getLayoutParams().height = batteryIcon.getLayoutParams().width = iconSize;
+
+        // lirbiLogo.getLayoutParams().height = panelSize;
+
+    }
+
+    @Subscribe
+    public void onMessegeBrightness(MessegeBrightness msg) {
+        BrightnessHelper.onMessegeBrightness(handler, msg, toastBrightnessText, overlay);
+    }
+
+    public View.OnClickListener onAutoScroll = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            onAutoScrollClick();
+        }
+    };
+
+    @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
+    public void tintSpeed() {
+        try {
+            // The speed bar over the page is as see-through as the panels
+            seekSpeedLayot.setAlpha(AppState.get().transparencyUI / 255f);
+            int tintColor = MagicHelper.getMusicColor();
+            if (dc.isMusicianMode()) {
+                // Its centre line as wide as the lines across it: the system's track keeps 2dp
+                // however tall the bar is let be, so it has one of its own
+                speedSeekBar.setProgressDrawable(speedTrack(tintColor, Dips.dpToPx(AppState.get().musicSpeedLineWidth)));
+                // The theme's tint would paint the passed part over in its own colour; the rest
+                // keeps its faintness under a tint of the same colour
+                speedSeekBar.setProgressTintList(ColorStateList.valueOf(tintColor));
+                speedSeekBar.setProgressBackgroundTintList(ColorStateList.valueOf(tintColor));
+            } else {
+                speedSeekBar.getProgressDrawable().mutate().setColorFilter(new PorterDuffColorFilter(tintColor, PorterDuff.Mode.SRC_IN));
+            }
+
+            speedSeekBar.getThumb().setColorFilter(new PorterDuffColorFilter(tintColor, PorterDuff.Mode.SRC_IN));
+
+            int color = MagicHelper.getTextOrIconColor();
+
+            seekBar.getProgressDrawable().mutate().setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN));
+
+            seekBar.getThumb().setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN));
+
+            paintTapZone(line1);
+            paintTapZone(line2);
+            SpeedBgView speedBg = dc.getActivity().findViewById(R.id.speedBgView1);
+            if (speedBg != null) {
+                speedBg.setBorderColor(tintColor);
+                if (dc.isMusicianMode()) {
+                    speedBg.setLineWidth(Dips.dpToPx(AppState.get().musicSpeedLineWidth));
+                }
+            }
+
+        } catch (Exception e) {
+            LOG.e(e);
+        }
+
+    }
+
+    public void showEditDialogIfNeed() {
+        DragingDialogs.dialogEditColors(anchor, dc, drawView, true, new Runnable() {
+            @Override
+            public void run() {
+                hideShowAnnotationLine();
+            }
+        });
+    }
+
+    public void doDoubleTap(int x, int y) {
+        if (dc.isMusicianMode()) {
+            if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_ADJUST_PAGE) {
+                dc.alignDocument();
+            }
+        } else {
+            if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_ZOOM_IN_OUT) {
+                dc.onZoomInOut(x, y);
+                AppState.get().isEditMode = false;
+                hideShow();
+            } else if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_ADJUST_PAGE) {
+                dc.alignDocument();
+            } else if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_CENTER_HORIZONTAL) {
+                dc.centerHorizontal();
+            } else if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_AUTOSCROLL) {
+                onAutoScrollClick();
+            } else if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_CLOSE_BOOK) {
+                closeAndRunList();
+            } else if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_CLOSE_HIDE_APP) {
+                Apps.showDesctop(a);
+            } else if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_SHARE_PAGE) {
+                ExtUtils.sharePage(dc, dc.getCurentPage() - 1);
+            } else if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_START_STOP_TTS) {
+                TTSService.playPause(dc.getActivity(), dc);
+
+            } else if (AppState.get().doubleClickAction1 == AppState.DOUBLE_CLICK_CLOSE_BOOK_AND_APP) {
+                dc.onCloseActivityFinal(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        MainTabs2.closeApp(dc.getActivity());
+                    }
+                });
+                dc.closeActivity();
+            }
+        }
+    }
+
+    public View.OnClickListener onLinkHistory = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            dc.onLinkHistory();
+            updateUI();
+        }
+    };
+
+    public void doShowHideWrapperControlls() {
+        AppState.get().isEditMode = !AppState.get().isEditMode;
+        hideShow();
+        Keyboards.invalidateEink(parentParent);
+
+    }
+
+    public void showHideHavigationBar() {
+        if (!AppState.get().isEditMode && AppState.get().fullScreenMode == AppState.FULL_SCREEN_FULLSCREEN) {
+            Keyboards.hideNavigation(a);
+        }
+    }
+
+    public void doChooseNextType(View view) {
+        final MyPopupMenu popupMenu = new MyPopupMenu(view.getContext(), view);
+
+        String pages = dc.getString(R.string.by_pages);
+        String screen = dc.getString(R.string.of_screen).toLowerCase(Locale.US);
+        String screens = dc.getString(R.string.by_screans);
+        final List<Integer> values = Arrays.asList(AppState.NEXT_SCREEN_SCROLL_BY_PAGES, 100, 95, 75, 50, 25, 10);
+
+        for (int i = 0; i < values.size(); i++) {
+            final int n = i;
+            String name = i == AppState.NEXT_SCREEN_SCROLL_BY_PAGES ? pages : values.get(i) + "% " + screen;
+            if (values.get(i) == 100) {
+                name = screens;
+            }
+
+            popupMenu.getMenu().add(name).setIcon(scrollByIcon(values.get(i))).setOnMenuItemClickListener(new OnMenuItemClickListener() {
+
+                @Override
+                public boolean onMenuItemClick(MenuItem item) {
+                    AppState.get().nextScreenScrollBy = values.get(n);
+                    initNextType();
+                    Keyboards.hideNavigation(dc.getActivity());
+                    return false;
+                }
+            });
+        }
+
+        popupMenu.getMenu().add(R.string.custom_value).setIcon(R.drawable.scroll_by_custom).setOnMenuItemClickListener(new OnMenuItemClickListener() {
+
+            @Override
+            public boolean onMenuItemClick(MenuItem item) {
+                Activity a = dc.getActivity();
+                final AlertDialog.Builder builder = new AlertDialog.Builder(a);
+                builder.setTitle(R.string.custom_value);
+
+                final CustomSeek myValue = new CustomSeek(a);
+                myValue.init(1, 100, AppState.get().nextScreenScrollMyValue);
+                myValue.setOnSeekChanged(new IntegerResponse() {
+
+                    @Override
+                    public boolean onResultRecive(int result) {
+                        AppState.get().nextScreenScrollMyValue = result;
+                        myValue.setValueText(AppState.get().nextScreenScrollMyValue + "%");
+                        return false;
+                    }
+                });
+                myValue.setValueText(AppState.get().nextScreenScrollMyValue + "%");
+
+                builder.setView(myValue);
+
+                builder.setPositiveButton(R.string.apply, new OnClickListener() {
+
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        AppState.get().nextScreenScrollBy = AppState.get().nextScreenScrollMyValue;
+                        initNextType();
+                        Keyboards.hideNavigation(dc.getActivity());
+
+                    }
+                });
+                builder.setNegativeButton(R.string.cancel, new OnClickListener() {
+
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                    }
+                });
+
+                builder.show();
+
+                return false;
+            }
+
+        });
+
+        popupMenu.show();
+
+    }
+
+    public View.OnClickListener onBookmarks = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            DragingDialogs.dialogShowBookmarks(anchor, dc, new Runnable() {
+
+                @Override
+                public void run() {
+                    showHideHistory();
+                    showPagesHelper();
+                    updateUI();
+                }
+            });
+        }
+    };
+
+    public void doHideShowToolBar() {
+        AppState.get().isShowToolBar = !AppState.get().isShowToolBar;
+        initToolBarPlusMinus();
+    }
+
+    public void initToolBarPlusMinus() {
+        if (AppState.get().isShowToolBar) {
+            toolBarButton.setImageResource(R.drawable.glyphicons_415_push_pin);
+        } else {
+            toolBarButton.setImageResource(R.drawable.glyphicons_305_no_symbol);
+        }
+        // Musician's mode with the panels away has no bar: only its name, the page slider and
+        // a close button, each on a round of the bar's colour, over the page. With the panels
+        // up its name stands ringed at the head of the title bar scroll mode has.
+        final boolean musicianBare = dc.isMusicianMode() && !AppState.get().isEditMode;
+        final boolean titleShown = !musicianBare && (AppState.get().isEditMode || AppState.get().isShowToolBar);
+        titleBar.setVisibility(titleShown ? View.VISIBLE : View.GONE);
+        // The row is painted, as see-through as the other panels, only while it is a bar
+        a.findViewById(R.id.underLayout).setBackgroundColor(titleShown
+                ? ColorUtils.setAlphaComponent(TintUtil.readerPanelColor(), AppState.get().transparencyUI)
+                : Color.TRANSPARENT);
+        if (musicClose != null) {
+            lirbiLogo.setVisibility(dc.isMusicianMode() ? View.VISIBLE : View.GONE);
+            // Without the slider its place is kept, so the close button stays at the far end
+            musicSeekRow.setVisibility(!musicianBare ? View.GONE
+                    : AppState.get().isShowMusicSeekBar ? View.VISIBLE : View.INVISIBLE);
+            final boolean closeShown = musicianBare && AppState.get().isShowMusicClose;
+            musicClose.setVisibility(closeShown ? View.VISIBLE : View.GONE);
+            // Without the close button the slider keeps the gap from the edge it kept
+            final ViewGroup.MarginLayoutParams seekLp = (ViewGroup.MarginLayoutParams) musicSeekRow.getLayoutParams();
+            final int seekRight = closeShown ? 0 : Dips.dpToPx(8);
+            if (seekLp.rightMargin != seekRight) {
+                seekLp.rightMargin = seekRight;
+                musicSeekRow.setLayoutParams(seekLp);
+            }
+            // The mode's settings are offered only with the panels up
+            musicSettings.setVisibility(dc.isMusicianMode() && titleShown ? View.VISIBLE : View.GONE);
+            paintMusicButtons();
+            // The bookmarks keep the gap the bar's buttons keep from the edge, unless they
+            // stand under musician's row, which keeps one under it already
+            if (musicButtonPanel != null) {
+                musicButtonPanel.setPadding(musicButtonPanel.getPaddingLeft(), musicianBare ? 0 : Dips.DP_6,
+                                            musicButtonPanel.getPaddingRight(), musicButtonPanel.getPaddingBottom());
+            }
+        }
+
+
+        if (musicianBare || AppState.get().isShowReadingProgress && AppState.get().isEditMode) {
+            progressDraw.setVisibility(View.GONE);
+        } else {
+            progressDraw.setVisibility(AppState.get().isShowReadingProgress ? View.VISIBLE : View.GONE);
+        }
+
+
+        toolBarButton.setVisibility(dc.isMusicianMode() ? View.GONE : View.VISIBLE);
+
+        batteryLevel.setVisibility(AppState.get().isShowBattery ? View.VISIBLE : View.GONE);
+        batteryIcon.setVisibility(AppState.get().isShowBattery ? View.VISIBLE : View.GONE);
+
+        currentTime.setVisibility(AppState.get().isShowTime ? View.VISIBLE : View.GONE);
+        clockIcon.setVisibility(AppState.get().isShowTime ? View.VISIBLE : View.GONE);
+
+    }
+
+    /** The icon of a scroll by pages or by a share of the screen, as the menu and its button show it. */
+    private static int scrollByIcon(int scrollBy) {
+        switch (scrollBy) {
+            case AppState.NEXT_SCREEN_SCROLL_BY_PAGES:
+                return R.drawable.scroll_by_page;
+            case 100:
+                return R.drawable.scroll_by_100;
+            case 95:
+                return R.drawable.scroll_by_95;
+            case 75:
+                return R.drawable.scroll_by_75;
+            case 50:
+                return R.drawable.scroll_by_50;
+            case 25:
+                return R.drawable.scroll_by_25;
+            case 10:
+                return R.drawable.scroll_by_10;
+            default:
+                return R.drawable.scroll_by_custom;
+        }
+    }
+
+    /**
+     * A ringed button's mark: before its name, or alone, drawn in the middle of the ring - a
+     * text view with no text would leave it at the left wherever the row makes the button
+     * wider or narrower than the mark. The ring itself is kept, as it was coloured for the
+     * theme, for the button to be dressed again and for others to copy.
+     */
+    public static void pillIcon(TextView button, Drawable icon, boolean alone) {
+        Object ring = button.getTag(R.id.pillRing);
+        if (!(ring instanceof Drawable)) {
+            ring = button.getBackground();
+            button.setTag(R.id.pillRing, ring);
+        }
+        // As large as the marks of the buttons beside it, in the colour of the name
+        final int size = Dips.dpToPx(24);
+        icon = icon.mutate();
+        icon.setColorFilter(new PorterDuffColorFilter(MagicHelper.getTextOrIconColor(), PorterDuff.Mode.SRC_IN));
+        if (alone && ring != null) {
+            final LayerDrawable layers = new LayerDrawable(new Drawable[]{(Drawable) ring, icon});
+            layers.setLayerGravity(1, Gravity.CENTER);
+            layers.setLayerSize(1, size, size);
+            button.setBackground(layers);
+            button.setCompoundDrawables(null, null, null, null);
+            button.setMinWidth(size + Dips.dpToPx(20));
+            button.setMinimumWidth(size + Dips.dpToPx(20));
+        } else {
+            button.setBackground((Drawable) ring);
+            icon.setBounds(0, 0, size, size);
+            button.setCompoundDrawables(icon, null, null, null);
+            button.setCompoundDrawablePadding(Dips.DP_6);
+        }
+    }
+
+    public void initNextType() {
+        final String name;
+        if (AppState.get().nextScreenScrollBy == AppState.NEXT_SCREEN_SCROLL_BY_PAGES) {
+            name = dc.getString(R.string.by_pages);
+            nextScreenType.setImageResource(R.drawable.my_glyphicons_full_page);
+        } else {
+            if (AppState.get().nextScreenScrollBy == 100) {
+                name = dc.getString(R.string.by_screans);
+            } else {
+                name = AppState.get().nextScreenScrollBy + "% " + dc.getString(R.string.of_screen);
+            }
+            nextScreenType.setImageResource(R.drawable.my_glyphicons_halp_page);
+        }
+
+        // The button is the icon of the scroll it is set to, alone, in either orientation:
+        // turned on its side the row has only half the bar beside the reading controls
+        // (LandscapeSplit), so the name goes into the description only
+        nextTypeBootom.setText("");
+        nextTypeBootom.setContentDescription(name);
+        nextTypeBootom.setMinWidth(0);
+        nextTypeBootom.setMinimumWidth(0);
+        // No wider than the icon and its ring, so it stands in the middle
+        if (nextTypeBootom.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+            final LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) nextTypeBootom.getLayoutParams();
+            if (lp.weight != 0) {
+                lp.weight = 0;
+                nextTypeBootom.setLayoutParams(lp);
+            }
+        }
+        final Drawable icon = ContextCompat.getDrawable(a, scrollByIcon(AppState.get().nextScreenScrollBy));
+        if (icon != null) {
+            pillIcon(nextTypeBootom, icon, true);
+        }
+    }
+
+    public View.OnLongClickListener onBookmarksLong = new View.OnLongClickListener() {
+
+        @Override
+        public boolean onLongClick(final View arg0) {
+            DragingDialogs.dialogAddBookmarksLong(anchor, dc);
+            showPagesHelper();
+            return true;
+        }
+    };
+
+    public void hideShowAnnotationLine() {
+        handler.removeCallbacks(checkPDFAnotations);
+        handler.postDelayed(checkPDFAnotations, 1000);
+    }
+
+    Runnable checkPDFAnotations = new Runnable() {
+        @Override
+        public void run() {
+            hideShowAnnotationLineInt();
+        }
+    };
+
+    private void hideShowAnnotationLineInt() {
+
+        try {
+            if (AppState.get().annotationsSaveMode != AppState.ANNOTATIONS_SAVE_AUTO) {
+                return;
+            }
+            if (!dc.getCurrentBook().getPath().endsWith(".pdf")) {
+                LOG.d("not-PDF");
+                return;
+            }
+            boolean hasNotSave = getController().hasPDFAnnotations();
+            if (hasNotSave) {
+                onSaveAnnotation.setVisibility(View.VISIBLE);
+            } else {
+                onSaveAnnotation.setVisibility(View.GONE);
+            }
+        } catch (Exception e) {
+            LOG.e(e);
+        }
+    }
+
+    public void hideShow() {
+        showTtsPageControls();
+        hideShowAnnotationLine();
+        showPagesHelper();
+
+        if (AppState.get().isEnableAccessibility) {
+            //AppState.get().isEditMode = true;
+        }
+
+        if (AppState.get().isEditMode) {
+            DocumentController.turnOnButtons(a);
+            show();
+
+        } else {
+            DocumentController.turnOffButtons(a);
+
+            hide();
+
+        }
+
+        initToolBarPlusMinus();
+        ViewBinder.hideShowRewardButton(a, showRewardVideo);
+
+        if (AppState.get().isAutoScroll) {
+            autoScroll.setImageResource(R.drawable.glyphicons_174_pause);
+        } else {
+            autoScroll.setImageResource(R.drawable.glyphicons_439_video_play_empty);
+        }
+
+        if (dc.isMusicianMode()) {
+            // The speed bar is there while the music scrolls, or while it is paused, as asked
+            fadeShow(seekSpeedLayot, AppState.get().isAutoScroll ? AppState.get().isShowMusicSpeedScrolling
+                    : AppState.get().isShowMusicSpeedPaused, AppState.get().transparencyUI / 255f);
+        } else {
+            if (AppState.get().isEditMode && AppState.get().isAutoScroll) {
+                seekSpeedLayot.setVisibility(View.VISIBLE);
+            } else {
+                seekSpeedLayot.setVisibility(View.GONE);
+            }
+        }
+
+        lirbiLogo.setVisibility(dc.isMusicianMode() ? View.VISIBLE : View.GONE);
+        // Put out of sight while the music scrolls with the panels away, as asked; a tap where
+        // it stands still brings the panels back
+        fadeTo(lirbiLogo, dc.isMusicianMode() && !AppState.get().isEditMode && AppState.get().isAutoScroll
+                && !AppState.get().isShowMusicButtonScrolling ? 0f : 1f);
+
+        // hideSeekBarInReadMode();
+        // showHideHavigationBar();
+        DocumentController.chooseFullScreen(dc.getActivity(), AppState.get().fullScreenMode);
+        showPagesHelper();
+
+        ViewBinder.updateBrightness(onBC);
+        showTtsControls();
+
+        //try eink fix
+
+    }
+
+    /**
+     * Puts the reading controls in the slot the recent panel keeps for them, on the middle of
+     * the row it names itself in - where the page-at-a-time screen stands them. They were a
+     * sheet of their own floating over the page.
+     */
+    private void moveTtsControlsIntoPanel() {
+        final View slot = a.findViewById(R.id.ttsControlsSlot);
+        if (ttsActive == null || !(slot instanceof ViewGroup) || ttsActive.getParent() == slot) {
+            return;
+        }
+        if (ttsActive.getParent() instanceof ViewGroup) {
+            ((ViewGroup) ttsActive.getParent()).removeView(ttsActive);
+        }
+        final FrameLayout.LayoutParams lp =
+                new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
+                                             FrameLayout.LayoutParams.WRAP_CONTENT);
+        lp.gravity = Gravity.CENTER;
+        ((ViewGroup) slot).addView(ttsActive, lp);
+    }
+
+    /** Until the book is open the reading controls stay out of the upright panel. */
+    private boolean bookLoading = true;
+
+    /**
+     * The reading controls stand with the panels while they are open: on their side always, as
+     * half of the split row, so the book can be started from there; upright only while speech is
+     * running, and never while the book is still loading. With the panels closed a second line of
+     * them stands on the page, below the words, while speech is running, unless the TTS dialog's
+     * advanced settings turn it off.
+     */
+    public void showTtsControls() {
+        if (ttsActive == null) {
+            return;
+        }
+        final boolean shown = LandscapeSplit.isLandscape(a) || !bookLoading && !TTSEngine.get().isShutdown();
+        ttsActive.setVisibility(TxtUtils.visibleIf(AppState.get().isEditMode && shown));
+        showTtsPageControls();
+    }
+
+    private void showTtsPageControls() {
+        if (ttsActivePage == null) {
+            return;
+        }
+        ttsActivePage.setTintColor(TintUtil.getStatusBarTextColor());
+        ttsActivePage.setVisibility(TxtUtils.visibleIf(!TTSEngine.get().isShutdown() && !AppState.get().isEditMode && AppState.get().isShowTtsPageControls));
+    }
+
+    public void hide() {
+        menuLayout.setVisibility(View.GONE);
+        bottomBar.setVisibility(View.GONE);
+        //adFrame.setVisibility(View.GONE);
+        // adFrame.setClickable(false);
+        imageMenuArrow.setImageResource(android.R.drawable.arrow_down_float);
+
+        // speedSeekBar.setVisibility(View.GONE);
+
+    }
+
+    public void _hideSeekBarInReadMode() {
+        if (!AppState.get().isEditMode) {
+            handler.removeCallbacks(hideSeekBar);
+            handler.postDelayed(hideSeekBar, 5000);
+        }
+    }
+
+    public View.OnClickListener onMenu = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            LOG.d("DEBUG", "Click");
+            doShowHideWrapperControlls();
+        }
+    };
+
+    public void show() {
+        showHideHistory();
+        menuLayout.setVisibility(View.VISIBLE);
+
+        titleBar.setVisibility(View.VISIBLE);
+
+        updateLock();
+
+        bottomBar.setVisibility(View.VISIBLE);
+        seekLine.setVisibility(AppState.get().isShowBottomSeekBar ? View.VISIBLE : View.GONE);
+        //adFrame.setVisibility(View.VISIBLE);
+        // adFrame.setClickable(true);
+        // adFrame.setTag(null);
+
+        imageMenuArrow.setImageResource(android.R.drawable.arrow_up_float);
+
+        // if (AppState.get().isAutoScroll &&
+        // AppState.get().isEditMode) {
+        // seekSpeedLayot.setVisibility(View.VISIBLE);
+        // }
+
+    }
+
+    public void showSearchDialog() {
+        if (AppSP.get().isCut) {
+            onModeChange.setImageResource(R.drawable.my_glyphicons_two_page_one);
+            AppSP.get().isCut = !false;
+            onCut.onClick(null);
+        }
+        if (AppSP.get().isCrop) {
+            onCrop.onClick(null);
+        }
+
+        DragingDialogs.dialogSearchText(anchor, dc, "");
+    }
+
+    public void onAutoScrollClick() {
+        if (dc.isVisibleDialog()) {
+            return;
+        }
+
+        AppState.get().isAutoScroll = !AppState.get().isAutoScroll;
+        // changeAutoScrollButton();
+        dc.onAutoScroll();
+        updateUI();
+    }
+
+    public View.OnClickListener onReverseKeys = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            LOG.d("DEBUG", "Click");
+            AppState.get().isReverseKeys = !AppState.get().isReverseKeys;
+            updateUI();
+        }
+    };
+
+    private boolean closeDialogs() {
+        return dc.closeDialogs();
+    }
+
+    public void hideAds() {
+        // adFrame.setTag("");
+        //  adFrame.setVisibility(View.GONE);
+    }
+
+    public void nextChose(boolean animate) {
+        nextChose(animate, 0);
+    }
+
+    public View.OnClickListener onFull = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View v) {
+            applyFullScreen(DocumentController.nextFullScreenMode(AppState.get().fullScreenMode));
+        }
+    };
+
+    /** The menu of every mode, kept on a long press for the one a notch calls for. */
+    public View.OnLongClickListener onFullLong = new View.OnLongClickListener() {
+
+        @Override
+        public boolean onLongClick(final View v) {
+            DocumentController.showFullScreenPopup(dc.getActivity(), v, id -> {
+                applyFullScreen(id);
+                return true;
+            }, AppState.get().fullScreenMode);
+            return true;
+        }
+    };
+
+    private void applyFullScreen(int mode) {
+        AppState.get().fullScreenMode = mode;
+        fullscreen.setImageResource(DocumentController.getFullScreenIcon(a, mode));
+
+        if (dc.isTextFormat()) {
+            onRefresh.run();
+            dc.restartActivity();
+        }
+        DocumentController.chooseFullScreen(a, mode);
+    }
+
+    public void nextChose(boolean animate, int repeatCount) {
+        LOG.d("nextChose");
+        dc.checkReadingTimer();
+
+        if (AppState.get().isEditMode) {
+            AppState.get().isEditMode = false;
+        }
+
+        if (AppState.get().nextScreenScrollBy == AppState.NEXT_SCREEN_SCROLL_BY_PAGES) {
+            dc.onNextPage(animate);
+        } else {
+            if (AppState.get().nextScreenScrollBy <= 50 && repeatCount == 0) {
+                animate = true;
+            }
+            dc.onNextScreen(animate);
+        }
+
+        //updateUI();
+
+    }
+
+    public void prevChose(boolean animate) {
+        prevChose(animate, 0);
+    }
+
+    public void prevChose(boolean animate, int repeatCount) {
+        dc.checkReadingTimer();
+
+        if (AppState.get().isEditMode) {
+            AppState.get().isEditMode = false;
+        }
+
+        if (AppState.get().nextScreenScrollBy == AppState.NEXT_SCREEN_SCROLL_BY_PAGES) {
+            dc.onPrevPage(animate);
+        } else {
+            if (AppState.get().nextScreenScrollBy <= 50 && repeatCount == 0) {
+                animate = true;
+            }
+            dc.onPrevScreen(animate);
+        }
+
+        //updateUI();
+    }
+
+    public View.OnClickListener onCrop = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View v) {
+            DragingDialogs.dialogCustomCrop(anchor, dc, new Runnable() {
+
+                @Override
+                public void run() {
+                    dc.onCrop();
+                    updateUI();
+
+                    AppState.get().isEditMode = false;
+                    hideShow();
+                    hideShowEditIcon();
+                }
+            });
+        }
+    };
+
+    public void setTitle(final String title) {
+        this.bookTitle = title;
+
+        hideShowEditIcon();
+
+    }
+
+    public void hideShowEditIcon() {
+        if (dc != null && !BookType.PDF.is(dc.getCurrentBook().getPath())) {
+            editTop2.setVisibility(View.GONE);
+        } else if (AppSP.get().isCut) {
+            editTop2.setVisibility(View.GONE);
+        } else {
+            boolean passwordProtected = dc.isPasswordProtected();
+            LOG.d("passwordProtected", passwordProtected);
+            if (dc != null && passwordProtected) {
+                editTop2.setVisibility(View.GONE);
+            } else {
+                // Only where the drawing can be written into the PDF, as paged mode has it
+                editTop2.setVisibility(dc != null && dc.isAnnotationsInsideDocument() ? View.VISIBLE : View.GONE);
+            }
+        }
+
+    }
+
+    public DocumentController getController() {
+        return dc;
+    }
+
+    public View.OnLongClickListener onCropLong = new View.OnLongClickListener() {
+
+        @Override
+        public boolean onLongClick(View v) {
+            AppSP.get().isCrop = !AppSP.get().isCrop;
+
+            dc.onCrop();
+            updateUI();
+
+            AppState.get().isEditMode = false;
+            hideShow();
+            hideShowEditIcon();
+            return true;
+        }
+    };
+
+    public DrawView getDrawView() {
+        return drawView;
+    }
+
+    public void showHelp() {
+        if (AppSP.get().isFirstTimeVertical) {
+            handler.postDelayed(new Runnable() {
+
+                @Override
+                public void run() {
+                    AppSP.get().isFirstTimeVertical = false;
+                    AppState.get().isEditMode = true;
+                    hideShow();
+                    Views.showHelpToast(lockUnlock);
+
+                }
+            }, 1000);
+        }
+    }
+
+    public void showPagesHelper() {
+        tintSpeed();
+        try {
+            BookmarkPanel.showPagesHelper(pageshelper, musicButtonPanel, dc, pagesBookmark, quickBookmark, onRefresh);
+        } catch (Exception e) {
+            LOG.e(e);
+        }
+    }
+
+    public View.OnClickListener onCut = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            AppSP.get().isCrop = false; // no crop with cut
+            AppState.get().cutP = 50;
+            AppSP.get().isCut = !AppSP.get().isCut;
+
+            crop.setVisibility(AppSP.get().isCut ? View.GONE : View.VISIBLE);
+
+            dc.onCrop();// crop false
+            dc.updateRendering();
+            dc.alignDocument();
+
+            updateUI();
+
+            progressDraw.updatePageCount(dc.getPageCount() - 1);
+            titleBar.setOnTouchListener(new HorizontallSeekTouchEventListener(onSeek, dc.getPageCount(), false));
+            progressDraw.setOnTouchListener(new HorizontallSeekTouchEventListener(onSeek, dc.getPageCount(), false));
+
+        }
+    };
+
+    public void showOutline(final List<OutlineLinkWrapper> list, final int count) {
+        try {
+            dc.activity.runOnUiThread(new Runnable() {
+
+                @Override
+                public void run() {
+                    Apps.accessibilityText(a, a.getString(R.string.book_is_open), a.getString(R.string.m_current_page), " " + dc.getCurentPageFirst1());
+
+                    progressDraw.updateDivs(list);
+                    progressDraw.updatePageCount(dc.getPageCount() - 1);
+                    titleBar.setOnTouchListener(new HorizontallSeekTouchEventListener(onSeek, dc.getPageCount(), false));
+                    progressDraw.setOnTouchListener(new HorizontallSeekTouchEventListener(onSeek, dc.getPageCount(), false));
+//                    if (TxtUtils.isListEmpty(list)) {
+//                        TintUtil.setTintImageWithAlpha(onDocDontext, Color.LTGRAY);
+//                    }
+//
+//                    if (ExtUtils.isNoTextLayerForamt(dc.getCurrentBook().getPath())) {
+//                        TintUtil.setTintImageWithAlpha(textToSpeach, Color.LTGRAY);
+//                    }
+                    if (dc.isTextFormat()) {
+                        // TintUtil.setTintImage(lockUnlock, Color.LTGRAY);
+                    }
+
+                    currentSeek.setVisibility(View.VISIBLE);
+                    maxSeek.setVisibility(View.VISIBLE);
+                    seekBar.setVisibility(View.VISIBLE);
+
+                    onCloseBook.setVisibility(View.VISIBLE);
+                    pagesCountIndicator.setVisibility(View.VISIBLE);
+
+                    showHelp();
+
+                    hideShowEditIcon();
+
+                    updateSpeedLabel();
+
+                    DialogsPlaylist.dispalyPlaylist(a, dc);
+                    HypenPanelHelper.init(parentParent, dc);
+
+                    showPagesHelper();
+
+                }
+            });
+        } catch (Exception e) {
+            LOG.e(e);
+        }
+
+    }
+
+    public void onResume() {
+        LOG.d("DocumentWrapperUI", "onResume");
+        handlerTimer.post(updateTimePower);
+
+        if (dc != null) {
+            dc.goToPageByTTS();
+        }
+
+        showTtsControls();
+
+    }
+
+    public void onPause() {
+        LOG.d("DocumentWrapperUI", "onPause");
+        handlerTimer.removeCallbacks(updateTimePower);
+    }
+
+    public View.OnClickListener onPrefTop = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            DragingDialogs.dialogPreferences(anchor, dc, onRefresh, new Runnable() {
+
+                @Override
+                public void run() {
+                    updateUI();
+
+                }
+            });
+        }
+    };
+
+    public void onDestroy() {
+        LOG.d("DocumentWrapperUI", "onDestroy");
+        handlerTimer.removeCallbacksAndMessages(null);
+        handler.removeCallbacksAndMessages(null);
+
+    }
+
+    public void onConfigChanged() {
+        try {
+            updateUI();
+        } catch (Exception e) {
+            LOG.e(e);
+        }
+    }
+
+    public void onLoadBookFinish() {
+        onCloseBook.setVisibility(View.VISIBLE);
+        bookLoading = false;
+        showTtsControls();
+    }
+
+    Runnable updateUIRunnable = new Runnable() {
+
+        @Override
+        public void run() {
+            updateUI();
+        }
+    };
+
+    View.OnClickListener onItemMenu = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View v) {
+            ShareDialog.show(a, dc.getCurrentBook(), new Runnable() {
+
+                @Override
+                public void run() {
+                    if (dc.getCurrentBook().delete()) {
+                        TempHolder.listHash++;
+                        AppDB.get().deleteBy(dc.getCurrentBook().getPath());
+                        dc.getActivity().finish();
+                    }
+                }
+            }, dc.getCurentPage() - 1, dc, new Runnable() {
+
+                @Override
+                public void run() {
+                    hideShow();
+
+                }
+            });
+            Keyboards.hideNavigation(a);
+            hideAds();
+        }
+    };
+
+    /** Puts the tap zones where the user left them, or where they start. */
+    private void layoutTapZones() {
+        tapZones.post(() -> {
+            final int w = tapZones.getWidth();
+            final int h = tapZones.getHeight();
+            if (w == 0 || h == 0) {
+                return;
+            }
+            tapZonesLandscape = w > h;
+            final float[] zones = tapZoneFractions(h, tapZonesLandscape);
+            placeTapZone(line1, zones, 0, w, h);
+            placeTapZone(line2, zones, 4, w, h);
+        });
+    }
+
+    // Which way the screen was turned when the tap zones were last put in place: each way keeps
+    // its own, and they are put in place again on a turn
+    private boolean tapZonesLandscape;
+
+    private static float[] tapZoneFractions(int height, boolean landscape) {
+        try {
+            final String[] saved = (landscape ? AppState.get().musicTapZonesLandscape
+                    : AppState.get().musicTapZones).split(",");
+            if (saved.length == 8) {
+                final float[] zones = new float[8];
+                for (int i = 0; i < 8; i++) {
+                    zones[i] = Float.parseFloat(saved[i]);
+                }
+                return zones;
+            }
+        } catch (Exception e) {
+            LOG.e(e);
+        }
+        // Where they start: a third of the width at either side, a little below the title bar,
+        // and a third of the screen tall at most
+        final float w = 1f / 3;
+        final float y = Dips.dpToPx(64) / (float) height;
+        final float h = Math.min(Dips.dpToPx(220), Dips.screenHeight() / 3) / (float) height;
+        return new float[]{0, y, w, h, 1 - w, y, w, h};
+    }
+
+    private static void placeTapZone(View zone, float[] zones, int i, int w, int h) {
+        final FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) zone.getLayoutParams();
+        lp.gravity = Gravity.TOP | Gravity.LEFT;
+        lp.leftMargin = Math.round(zones[i] * w);
+        lp.topMargin = Math.round(zones[i + 1] * h);
+        lp.width = Math.round(zones[i + 2] * w);
+        lp.height = Math.round(zones[i + 3] * h);
+        zone.setLayoutParams(lp);
+    }
+
+    private void saveTapZones() {
+        final float w = tapZones.getWidth();
+        final float h = tapZones.getHeight();
+        if (w == 0 || h == 0) {
+            return;
+        }
+        final StringBuilder zones = new StringBuilder();
+        for (View zone : new View[]{line1, line2}) {
+            final FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) zone.getLayoutParams();
+            for (float value : new float[]{lp.leftMargin / w, lp.topMargin / h, lp.width / w, lp.height / h}) {
+                zones.append(zones.length() == 0 ? "" : ",").append(value);
+            }
+        }
+        if (w > h) {
+            AppState.get().musicTapZonesLandscape = zones.toString();
+        } else {
+            AppState.get().musicTapZones = zones.toString();
+        }
+    }
+
+    /**
+     * While the scrolling is paused a tap zone is taken with a finger and put elsewhere, or,
+     * taken near one of its edges, made bigger or smaller on that side. A tap still turns the
+     * page; while the music scrolls the zone is left to its tap alone.
+     */
+    private class TapZoneDrag implements View.OnTouchListener {
+        private final int edge = Dips.dpToPx(28);
+        private final int min = Dips.dpToPx(48);
+        private final int slop = Dips.dpToPx(8);
+        private float downX, downY;
+        private int left, top, width, height;
+        private boolean l, t, r, b, dragging;
+
+        @Override
+        public boolean onTouch(View v, MotionEvent e) {
+            if (AppState.get().isAutoScroll) {
+                return false;
+            }
+            final FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) v.getLayoutParams();
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = e.getRawX();
+                    downY = e.getRawY();
+                    left = lp.leftMargin;
+                    top = lp.topMargin;
+                    width = v.getWidth();
+                    height = v.getHeight();
+                    l = e.getX() < edge;
+                    r = e.getX() > width - edge;
+                    t = e.getY() < edge;
+                    b = e.getY() > height - edge;
+                    dragging = false;
+                    return true;
+                case MotionEvent.ACTION_MOVE: {
+                    final int dx = Math.round(e.getRawX() - downX);
+                    final int dy = Math.round(e.getRawY() - downY);
+                    if (!dragging && Math.hypot(dx, dy) < slop) {
+                        return true;
+                    }
+                    dragging = true;
+                    final int w = tapZones.getWidth();
+                    final int h = tapZones.getHeight();
+                    int nl = left, nt = top, nw = width, nh = height;
+                    if (!(l || r || t || b)) {
+                        nl = clamp(left + dx, 0, w - width);
+                        nt = clamp(top + dy, 0, h - height);
+                    } else {
+                        if (l) {
+                            nl = clamp(left + dx, 0, left + width - min);
+                            nw = left + width - nl;
+                        }
+                        if (r) {
+                            nw = clamp(width + dx, min, w - left);
+                        }
+                        if (t) {
+                            nt = clamp(top + dy, 0, top + height - min);
+                            nh = top + height - nt;
+                        }
+                        if (b) {
+                            nh = clamp(height + dy, min, h - top);
+                        }
+                    }
+                    lp.leftMargin = nl;
+                    lp.topMargin = nt;
+                    lp.width = nw;
+                    lp.height = nh;
+                    v.setLayoutParams(lp);
+                    return true;
+                }
+                case MotionEvent.ACTION_UP:
+                    if (dragging) {
+                        saveTapZones();
+                    } else {
+                        v.performClick();
+                    }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    if (dragging) {
+                        saveTapZones();
+                    }
+                    return true;
+            }
+            return false;
+        }
+
+        private int clamp(int value, int low, int high) {
+            return Math.max(low, Math.min(value, Math.max(low, high)));
+        }
+    }
+
+    /**
+     * A musician's tap zone: a faint round of the mode's colour with no outline drawn over
+     * the music, or, as chosen in the mode's settings, see-through with a dotted line round it.
+     */
+    private static void paintTapZone(View zone) {
+        final GradientDrawable fill = new GradientDrawable();
+        fill.setCornerRadius(Dips.dpToPx(16));
+        if (AppState.get().isMusicTapZonesDotted) {
+            // Or see-through, with only a dotted line round it in the mode's colour
+            fill.setColor(Color.TRANSPARENT);
+            // as see-through as the panels
+            // as see-through as the panels, as wide as chosen, the dots growing with it
+            final int width = Math.max(1, AppState.get().musicTapZoneLineWidth);
+            fill.setStroke(Dips.dpToPx(width),
+                           ColorUtils.setAlphaComponent(MagicHelper.getMusicColor(), AppState.get().transparencyUI),
+                           Dips.dpToPx(Math.max(6, width * 3)), Dips.dpToPx(Math.max(5, width * 5 / 2)));
+        } else {
+            // faint, and fainter as the panels are made more see-through
+            fill.setColor(ColorUtils.setAlphaComponent(MagicHelper.getMusicColor(),
+                                                       Math.round(30f * AppState.get().transparencyUI / 255)));
+        }
+        zone.setBackground(fill);
+    }
+
+    /**
+     * A seek bar track of a given thickness, centred in the bar: the part passed in a colour, the
+     * rest in the same colour fainter.
+     */
+    private static LayerDrawable speedTrack(int color, int height) {
+        final GradientDrawable rest = new GradientDrawable();
+        rest.setColor(ColorUtils.setAlphaComponent(color, 100));
+        rest.setCornerRadius(height / 2f);
+        final GradientDrawable passed = new GradientDrawable();
+        passed.setColor(color);
+        passed.setCornerRadius(height / 2f);
+        final LayerDrawable track = new LayerDrawable(new Drawable[]{rest,
+                new ClipDrawable(passed, Gravity.LEFT, ClipDrawable.HORIZONTAL)});
+        track.setId(0, android.R.id.background);
+        track.setId(1, android.R.id.progress);
+        for (int i = 0; i < 2; i++) {
+            track.setLayerHeight(i, height);
+            track.setLayerGravity(i, Gravity.CENTER_VERTICAL | Gravity.FILL_HORIZONTAL);
+        }
+        return track;
+    }
+
+    private static final int FADE_MS = 250;
+
+    /** Fades a view to an alpha, from wherever it is, rather than setting it at once. */
+    private static void fadeTo(View view, float alpha) {
+        view.animate().cancel();
+        if (view.getAlpha() != alpha) {
+            view.animate().alpha(alpha).setDuration(FADE_MS).start();
+        }
+    }
+
+    /** Fades a view in to an alpha, or out and then away, rather than showing or hiding it at once. */
+    private static void fadeShow(View view, boolean show, float alpha) {
+        view.animate().cancel();
+        if (show) {
+            if (view.getVisibility() != View.VISIBLE) {
+                view.setAlpha(0f);
+                view.setVisibility(View.VISIBLE);
+            }
+            view.animate().alpha(alpha).setDuration(FADE_MS).start();
+        } else if (view.getVisibility() == View.VISIBLE) {
+            view.animate().alpha(0f).setDuration(FADE_MS).withEndAction(() -> {
+                view.setVisibility(View.GONE);
+                view.setAlpha(alpha);
+            }).start();
+        }
+    }
+
+    private static float musicButtonScale() {
+        switch (AppState.get().musicButtonSize) {
+            case AppState.MUSIC_BUTTON_SMALL:
+                return 0.8f;
+            case AppState.MUSIC_BUTTON_LARGE:
+                return 1.3f;
+            default:
+                return 1f;
+        }
+    }
+
+    /**
+     * Musician's name and close button stand on the page with no bar under them: each on a
+     * round of the mode's colour (the bar's until one is chosen), as see-through as the panels,
+     * answering a press; the page slider between them on the same round. On the bar, with the
+     * panels up, the name is ringed as well, in its text colour.
+     */
+    private void paintMusicButtons() {
+        lirbiLogo.setTextColor(MagicHelper.getTextOrIconColor());
+        final int ring = lirbiLogo.getCurrentTextColor();
+        musicClose.setImageTintList(ColorStateList.valueOf(ring));
+        final boolean onBar = AppState.get().isEditMode;
+        // The rounds are in the mode's colour, chosen in its settings - the bar's until one is
+        final int fill = ColorUtils.setAlphaComponent(MagicHelper.getMusicColor(), AppState.get().transparencyUI);
+        // On the bar the name is a ring only, unless a colour of its own was chosen: a round of
+        // the bar's colour would lay it twice
+        final boolean chosen = (AppState.get().isDayNotInvert ? AppState.get().musicColorDay
+                : AppState.get().musicColorNight) != 0;
+        lirbiLogo.setBackground(musicButton(GradientDrawable.RECTANGLE, onBar && !chosen ? Color.TRANSPARENT : fill,
+                                            onBar ? ring : Color.TRANSPARENT));
+        musicClose.setBackground(musicButton(GradientDrawable.OVAL, fill, Color.TRANSPARENT));
+        // Only ever on the bar, so ringed and filled like the name
+        musicSettings.setBackground(musicButton(GradientDrawable.OVAL, chosen ? fill : Color.TRANSPARENT, ring));
+        musicSettings.setImageTintList(ColorStateList.valueOf(ring));
+        musicSeekRow.setBackground(musicButton(GradientDrawable.RECTANGLE, fill, Color.TRANSPARENT));
+        musicCurrent.setTextColor(ring);
+        musicMax.setTextColor(ring);
+        musicSeekBar.setProgressTintList(ColorStateList.valueOf(ring));
+        musicSeekBar.setThumbTintList(ColorStateList.valueOf(ring));
+        musicSeekBar.setProgressBackgroundTintList(ColorStateList.valueOf(ring));
+    }
+
+    private static RippleDrawable musicButton(int shape, int color, int ring) {
+        final GradientDrawable fill = new GradientDrawable();
+        fill.setShape(shape);
+        fill.setColor(color);
+        if (ring != Color.TRANSPARENT) {
+            fill.setStroke(Dips.dpToPx(1), ring);
+        }
+        final GradientDrawable mask = new GradientDrawable();
+        mask.setShape(shape);
+        mask.setColor(Color.WHITE);
+        if (shape == GradientDrawable.RECTANGLE) {
+            fill.setCornerRadius(Dips.dpToPx(100));
+            mask.setCornerRadius(Dips.dpToPx(100));
+        }
+        return new RippleDrawable(ColorStateList.valueOf(Color.parseColor("#3c888888")), fill, mask);
+    }
+
+    View.OnClickListener onLirbiLogoClick = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View v) {
+            doShowHideWrapperControlls();
+        }
+    };
+
+    View.OnClickListener onGoToPAge1 = new View.OnClickListener() {
+
+        @Override
+        public void onClick(View v) {
+            dc.onScrollY(0);
+            updateUI();
+        }
+    };
+
+    public View.OnClickListener onNormalMode = new View.OnClickListener() {
+
+        @Override
+        public void onClick(final View arg0) {
+            AppSP.get().readingMode = AppState.READING_MODE_BOOK;
+            initUI(a);
+            hideShow();
+        }
+    };
+
+    // public void changeAutoScrollButton() {
+    // if (AppState.get().isAutoScroll) {
+    // autoScroll.setImageResource(android.R.drawable.ic_media_pause);
+    // seekSpeedLayot.setVisibility(View.VISIBLE);
+    // } else {
+    // autoScroll.setImageResource(android.R.drawable.ic_media_play);
+    // seekSpeedLayot.setVisibility(View.GONE);
+    // }
+    //
+    // }
+
+}

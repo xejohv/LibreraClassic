@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- 离线阅读器：库里的 manifest 会重新并入网络权限，这里显式剔除 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+
+
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="text/plain" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <!-- The paid app, looked for by name to keep the ads out of this one while it is
+             installed. Since Android 11 another app's package cannot be looked up unless it is
+             named here, and the look-up came back empty on every such device. -->
+        <package android:name="com.foobnix.pro.pdf.reader" />
+        <!-- LibreraX, the reading mode that hands the book over to it. -->
+        <package android:name="com.librerax" />
+    </queries>
+
+    <application>
+
+        <meta-data
+            android:name="android.webkit.WebView.MetricsOptOut"
+            android:value="true" />
+
+        
+        
+        
+        
+        <!--
+            The OAuth client the "Sign in with Google" sheet names the app by: a Web application
+            client of the same Google project as the app's Android client. Left empty, the sign-in
+            falls back on GOOGLE_DRIVE_KEY, and then on the system account chooser.
+        -->
+        
+
+        
+
+
+        <provider android:process=":reader"             android:name="androidx.core.content.FileProvider"
+            android:authorities="io.github.xejohv.libreraclassic.reader.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/paths" />
+        </provider>
+
+        <activity android:process=":reader"             android:name="com.foobnix.zipmanager.SendReceiveActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
+        <activity-alias android:process=":reader"             android:name="com.foobnix.zipmanager.SendReceiveActivityAlias"
+            android:exported="false"
+            android:targetActivity="com.foobnix.zipmanager.SendReceiveActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity android:process=":reader"             android:name="com.foobnix.OpenerActivity"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustPan"
+            android:screenOrientation="portrait">
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+
+                <data android:mimeType="application/x-fictionbook+xml" />
+                <data android:mimeType="application/x-fictionbook" />
+                <data android:mimeType="application/x-fb2" />
+                <data android:mimeType="application/x-zip-compressed-fb2" />
+                <data android:mimeType="application/fb2+zip" />
+                <data android:mimeType="application/fb2.zip" />
+                <data android:mimeType="application/fb2" />
+                <data android:mimeType="application/epub" />
+                <data android:mimeType="application/epub+zip" />
+                <data android:mimeType="application/mobi" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/x-mobipocket-ebook" />
+                <data android:mimeType="application/x-palm-database" />
+                <data android:mimeType="application/x-cbz" />
+                <data android:mimeType="application/comicbook+zip" />
+                <data android:mimeType="application/x-cbr" />
+                <data android:mimeType="application/comicbook+rar" />
+                <data android:mimeType="application/rtf" />
+                <data android:mimeType="application/x-rtf" />
+                <data android:mimeType="application/azw" />
+                <data android:mimeType="application/azw3" />
+                <data android:mimeType="application/x-mobi8-ebook" />
+                <data android:mimeType="application/x-kindle-application" />
+                <data android:mimeType="application/x-mimearchive" />
+                <data android:mimeType="application/vnd.oasis.opendocument.text" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                <data android:mimeType="application/msword" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/vnd.ms-xpsdocument" />
+                <data android:mimeType="application/oxps" />
+                <data android:mimeType="application/x-chm" />
+                <data android:mimeType="application/vnd.ms-htmlhelp" />
+
+                <data android:mimeType="text/rtf" />
+                <data android:mimeType="text/richtext" />
+                <data android:mimeType="text/html" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/x-log" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+
+                <data android:mimeType="multipart/related" />
+                <data android:mimeType="message/rfc822" />
+
+                <data android:mimeType="image/djvu" />
+                <data android:mimeType="image/vnd.djvu" />
+                <data android:mimeType="image/x-djvu" />
+                <data android:mimeType="image/x.djvu" />
+                <data android:mimeType="image/tiff" />
+
+
+                <data android:mimeType="application/x-compressed" />
+                <data android:mimeType="application/x-compressed-zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/zip" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\.log" />
+                <data android:pathPattern=".*\\.epub" />
+                <data android:pathPattern=".*\\.fb2" />
+                <data android:pathPattern=".*\\fb2.zip" />
+                <data android:pathPattern=".*\\.pdf" />
+                <data android:pathPattern=".*\\.djvu" />
+                <data android:pathPattern=".*\\.rtf" />
+                <data android:pathPattern=".*\\.html" />
+                <data android:pathPattern=".*\\.htm" />
+                <data android:pathPattern=".*\\.mht" />
+                <data android:pathPattern=".*\\.mhtml" />
+                <data android:pathPattern=".*\\.mobi" />
+                <data android:pathPattern=".*\\.azw" />
+                <data android:pathPattern=".*\\.azw3" />
+                <data android:pathPattern=".*\\.azw4" />
+                <data android:pathPattern=".*\\.prc" />
+                <data android:pathPattern=".*\\.cbz" />
+                <data android:pathPattern=".*\\.cbr" />
+                <data android:pathPattern=".*\\.tiff" />
+                <data android:pathPattern=".*\\.odt" />
+                <data android:pathPattern=".*\\.docx" />
+                <data android:pathPattern=".*\\.doc" />
+                <data android:pathPattern=".*\\.xps" />
+                <data android:pathPattern=".*\\.zip" />
+                <data android:pathPattern=".*\\.md" />
+                <data android:pathPattern=".*\\.chm" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_" />
+
+                <category android:name="android.intent.category.DEFAULT_" />
+                <category android:name="android.intent.category.BROWSABLE_" />
+
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+
+
+            </intent-filter>
+
+        </activity>
+
+
+        <activity android:process=":reader"             android:name="com.foobnix.pdf.search.activity.HorizontalViewActivity"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustPan" 
+            android:screenOrientation="portrait" />
+
+        <activity android:process=":reader"             android:name="com.foobnix.librerax.LibreraXActivity"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:exported="false"
+            android:theme="@style/LibreraXBlack" 
+            android:screenOrientation="portrait" />
+
+        <activity android:process=":reader"             android:name="org.ebookdroid.ui.viewer.VerticalViewActivity"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustPan"
+            android:screenOrientation="portrait">
+
+        </activity>
+
+        <!--
+        <service android:process=":reader"             android:name="com.foobnix.ui2.BooksService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
+            -->
+
+        <!-- PDF, DjVu and TIFF covers are drawn in a process of their own, which is killed when a
+             page takes too long: see com.foobnix.sys.CoverProcess -->
+        <service
+            android:name="com.foobnix.sys.CoverRenderService"
+            android:exported="false"
+            android:process=":covers" />
+
+        <service android:process=":reader"             android:name="com.foobnix.tts.TTSService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+
+        </service>
+
+
+        <receiver android:process=":reader"             android:name="androidx.media.session.MediaButtonReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- text to speech is gone: no player, no widget -->
+
+
+
+        <activity android:process=":reader"             android:name="com.foobnix.ui2.CloudrailActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="podclassic-reader" />
+                <data android:scheme="librera" />
+            </intent-filter>
+        </activity>
+
+
+        <activity android:process=":reader"             android:name="com.foobnix.test.ActivityA"
+            android:launchMode="singleTop"
+            android:exported="false"
+            android:screenOrientation="portrait">
+
+        </activity>
+
+        <activity android:process=":reader"             android:name="com.foobnix.test.ActivityB"
+            android:launchMode="singleTask"
+            android:exported="false" 
+            android:screenOrientation="portrait" />
+
+        <activity android:process=":reader"             android:name="com.foobnix.ui2.MainTabs2"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:resizeableActivity="true"
+
+            android:windowSoftInputMode="stateHidden"
+            android:screenOrientation="portrait">
+
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH1" />
+                <category android:name="android.intent.category.DEFAULT1" />
+            </intent-filter>
+
+        </activity>
+
+
+        <receiver android:process=":reader"             android:name=".widget.RecentBooksWidget"
+            android:exported="false"
+            >
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/recent_images_provider_3x1" />
+        </receiver>
+
+        <receiver android:process=":reader"             android:name=".widget.BookCoverWidget"
+            android:exported="false"
+            >
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/book_cover_provider" />
+        </receiver>
+
+        <service android:process=":reader"             android:name=".widget.StackGridWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <activity
+            android:name="io.github.xejohv.classic.ClassicReaderActivity"
+            android:process=":reader"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+    </application>
+
+</manifest>

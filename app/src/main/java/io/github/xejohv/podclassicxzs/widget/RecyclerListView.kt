@@ -1,0 +1,991 @@
+package io.github.xejohv.podclassicxzs.widget
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.graphics.drawable.GradientDrawable
+import android.os.Build
+import android.util.Log
+import android.view.GestureDetector
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import io.github.xejohv.podclassicxzs.util.ThreadUtil
+import io.github.xejohv.podclassicxzs.values.Colors
+import io.github.xejohv.podclassicxzs.values.Values
+import io.github.xejohv.podclassicxzs.values.Values.DEFAULT_PADDING
+import io.github.xejohv.podclassicxzs.widget.TextView.Companion.TEXT_SIZE
+import java.util.*
+import kotlin.math.abs
+
+
+open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(context) {
+
+    companion object {
+        const val DEFAULT_MAX_SIZE = 10
+        const val DELAY = 75
+        const val QUICK_SLIDE = DEFAULT_MAX_SIZE * 5
+        // 列表顶部内边距（dp），让首行文字与标题栏之间留出呼吸空间
+        private const val TOP_INSET_DP = 4f
+        // 列表滑动判定阈值：手指纵向移动超过该像素才走一行（原为 10px，太灵敏）
+        private const val SLIDE_PX = 70f
+    }
+
+    constructor(context: Context) : this(context, DEFAULT_MAX_SIZE)
+
+    private val recyclerView: RecyclerView
+    /** 一屏真正能放下的行数：由列表高度 / 行高算出，原来固定按 MAX_SIZE 分页，
+     *  行高比预想大时最后几行永远露不出来（设置页、专辑曲目都踩过）。 */
+    private var visibleCount = DEFAULT_MAX_SIZE
+    private var measuredRows = false
+    private val adapter: ItemAdapter
+    private val scrollBar = ScrollBar(context)
+    /** 滚动条是否真的需要：item 绑定边距要用它，必须和 updateScrollBar 的判定同源 */
+    private var scrollBarVisible = false
+    /** 列表宽度够不够放滚动条槽位：主页左栏这类窄栏不放，避免文字被裁 */
+    private var isWideList = false
+    /** 单行高度（px）：判断「内容是否真的超出可视高度」要用它，ceil 行数会把刚好多半行的情况判成放得下 */
+    private var rowHeightPx = 0
+    private val indexView = android.widget.TextView(context)
+    private val recyclerParams: LayoutParams
+
+    // 触摸起始位置
+    private var touchStartY = 0f
+
+    init {
+        // 创建 RecyclerView
+        recyclerView = RecyclerView(context)
+        recyclerView.layoutManager = LinearLayoutManager(context)
+        recyclerView.overScrollMode = View.OVER_SCROLL_NEVER
+        // 禁止子项抢焦点，否则 RecyclerView 会自动滚动把焦点项顶到边缘，导致首行文字被裁
+        recyclerView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        
+        // 创建 Adapter
+        adapter = ItemAdapter()
+        recyclerView.adapter = adapter
+
+        // 添加 RecyclerView
+        recyclerParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        recyclerParams.rightMargin = DEFAULT_PADDING
+        // 顶部留一点余量，避免第一行文字紧贴标题栏看起来被“压住”
+        val densityTop = context.resources.displayMetrics.density
+        recyclerView.setPadding(0, (TOP_INSET_DP * densityTop).toInt(), 0, 0)
+        recyclerView.clipToPadding = true
+        this.addView(recyclerView, recyclerParams)
+
+        // 添加滚动条
+        val scrollBarLayoutParams =
+            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
+        scrollBarLayoutParams.gravity = Gravity.END
+        this.addView(scrollBar, scrollBarLayoutParams)
+
+        // 初始化索引视图
+        indexView.visibility = INVISIBLE
+        val layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+        layoutParams.gravity = Gravity.CENTER
+        indexView.layoutParams = layoutParams
+
+        indexView.setTextColor(Colors.text_light)
+        indexView.setBackgroundColor(Colors.color_primary)
+
+        indexView.setPadding(
+            DEFAULT_PADDING * 4,
+            DEFAULT_PADDING * 3,
+            DEFAULT_PADDING * 4,
+            DEFAULT_PADDING * 3
+        )
+
+        val gradientDrawable = GradientDrawable()
+        gradientDrawable.setColor(Colors.color_primary)
+        gradientDrawable.cornerRadius = 4f
+        gradientDrawable.setStroke(DEFAULT_PADDING * 4, Colors.color_primary)
+
+        indexView.background = gradientDrawable
+        indexView.textSize = 20f
+        indexView.gravity = Gravity.CENTER
+
+        indexView.width = DEFAULT_PADDING * 10
+        indexView.maxWidth = DEFAULT_PADDING * 10
+        indexView.minWidth = DEFAULT_PADDING * 10
+
+        addView(indexView)
+
+        // 确保 RecyclerListView 是可点击和可触摸的
+        isClickable = true
+        isFocusable = true
+        isFocusableInTouchMode = true
+
+        // 添加触摸事件监听器（仅处理滑动，不拦截点击）
+        setOnTouchListener { view, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    touchStartY = event.y
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaY = event.y - touchStartY
+                    
+                    if (Math.abs(deltaY) > SLIDE_PX) {
+                        if (deltaY < 0) {
+                            onSlide(1)
+                        } else {
+                            onSlide(-1)
+                        }
+                        touchStartY = event.y
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                }
+            }
+            // 返回 false 让事件继续传递给子 view（如 ItemView）
+            false
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        refreshList()
+    }
+
+    protected var itemList: ArrayList<Item> = arrayListOf()
+        set(list) {
+            field = list
+            refreshList()
+        }
+
+    fun addIfNotExist(item: Item) {
+        addIfNotExist(item, size())
+    }
+
+    fun addIfNotExist(item: Item, index: Int) {
+        if (!itemList.contains(item)) {
+            add(item, index)
+        } else {
+            // item 已存在，但仍需刷新视图
+            refreshList()
+        }
+    }
+
+    fun add(item: Item, index: Int) {
+        itemList.add(index, item)
+        // 如果在索引 0 添加，确保 position 更新以显示新 item
+        if (index == 0 && position > 0) {
+            position = 0
+            // 当前选中的 index 也需要相应调整（因为所有元素都向后移动了一位）
+            this.index++
+        }
+        refreshList()
+    }
+
+    fun add(item: Item) {
+        add(item, size())
+    }
+
+    fun addAll(items: List<Item>) {
+        itemList.addAll(items)
+        refreshList()
+    }
+
+    fun addAll(items: List<Item>, index: Int) {
+        itemList.addAll(index, items)
+        refreshList()
+    }
+
+    fun remove(item: Item) {
+        if (itemList.remove(item)) {
+            if (index == itemList.size) {
+                index--
+            }
+            if (index < 0) {
+                index = 0
+            }
+            refreshList()
+        }
+    }
+
+    fun getItem(index: Int): Item {
+        return itemList[index]
+    }
+
+    fun getCurrentItem(): Item {
+        return getItem(index)
+    }
+
+    fun getCurrentIndex(): Int {
+        return index
+    }
+
+    fun setCurrent(index: Int) {
+        this.index = index
+        this.position =
+            (index - visibleCount / 2).coerceAtMost(itemList.size - visibleCount).coerceAtLeast(0)
+        refreshList()
+    }
+
+    fun shake() {
+        // RecyclerView 中不需要实现 shake，或者可以通过其他方式实现
+    }
+
+    fun removeCurrentItem() {
+        if (index < itemList.size) {
+            itemList.removeAt(index)
+            if (index == itemList.size) {
+                index--
+            }
+            if (index < 0) {
+                index = 0
+            }
+            if (position > 0 && position + visibleCount > itemList.size) {
+                position--
+            }
+            refreshList()
+        }
+    }
+
+    fun refreshList() {
+        // 兜底：列表条目变少时把游标拉回有效范围，否则会出现「标题正常但整页空白」
+        val n = itemList.size
+        val maxPosition = (n - visibleCount).coerceAtLeast(0)
+        if (position > maxPosition) {
+            position = maxPosition
+        }
+        if (position < 0) {
+            position = 0
+        }
+        if (n > 0) {
+            if (index >= n) {
+                index = n - 1
+            }
+            if (index < 0) {
+                index = 0
+            }
+        } else {
+            index = 0
+            position = 0
+        }
+        adapter.notifyDataSetChanged()
+        updateScrollBar()
+        updateHighlight()
+    }
+
+    private fun updateScrollBar() {
+        val oldShowScrollBar = scrollBar.visibility == View.VISIBLE
+        val capacity = scrollCapacity()
+        scrollBar.setScrollBar(position, capacity, itemList.size)
+        // 窄栏（主页左栏那种整个列表只占屏幕三分之一）不预留滚动条槽位：
+        // 它本身放得下，硬扣 36px 会把「附加程序」「随机播放」裁掉。
+        // 整屏宽的列表只要确实分页（条目多于一屏）就常驻槽位，滚动时宽度不变。
+        val reserveSlot = isWideList
+        val paged = itemList.size > capacity
+        val newShowScrollBar = reserveSlot && paged
+        scrollBar.visibility = if (newShowScrollBar) View.VISIBLE else View.GONE
+        scrollBarVisible = newShowScrollBar
+        // 整屏宽的列表槽位常驻（不随滚动条显隐变化，避免滚动时横向缩一下）
+        recyclerParams.rightMargin = if (reserveSlot) DEFAULT_PADDING else 0
+        recyclerView.layoutParams = recyclerParams
+        // 如果滚动条显示状态发生变化，刷新所有可见 item
+        if (oldShowScrollBar != newShowScrollBar) {
+            adapter.notifyDataSetChanged()
+        }
+    }
+
+    /** 一屏能完整放下的行数（向下取整）：只要条目多过它，内容就真的超出可视高度，
+     *  底部那行会被切掉、列表能滑动，滚动条必须出现。
+     *  这里不能用 visibleCount（它是向上取整的渲染行数），9 条目 8.x 行会被算成 9 行，
+     *  结果音效这类 9 项设置页明明能滚却一根滚动条都没有。 */
+    private fun scrollCapacity(): Int {
+        val rh = rowHeightPx
+        val vh = recyclerView.height - recyclerView.paddingTop - recyclerView.paddingBottom
+        if (rh > 0 && vh > 0) return (vh / rh).coerceAtLeast(1)
+        return visibleCount
+    }
+    private fun updateHighlight() {
+        // 更新高亮状态
+        recyclerView.post {
+            for (i in 0 until recyclerView.childCount) {
+                val viewHolder = recyclerView.getChildViewHolder(recyclerView.getChildAt(i))
+                if (viewHolder is ItemViewHolder) {
+                    val itemIndex = position + i
+                    viewHolder.setHighlight(highlightEnabled && itemIndex == index)
+                }
+            }
+        }
+    }
+
+    open fun refreshItem() {
+        if (itemList.isEmpty() || index >= itemList.size) return
+        val item = itemList[index]
+        // 刷新当前项
+        adapter.notifyItemChanged(index - position)
+    }
+
+    /**
+     * 强制刷新列表，使用 RecyclerView.post 确保在布局完成后刷新
+     * 适用于视图刚刚添加到屏幕时的刷新
+     */
+    fun forceRefresh() {
+        recyclerView.post {
+            // 双重 post 确保 RecyclerView 布局完成
+            recyclerView.post {
+                // 计算最后一个 item 的索引
+                val lastIndex = itemList.size - 1
+                if (lastIndex >= 0) {
+                    // 设置高亮到最后一个 item
+                    index = lastIndex
+                    // 计算 position 使最后一个 item 可见
+                    position = (lastIndex - visibleCount + 1).coerceAtLeast(0)
+                } else {
+                    position = 0
+                    index = 0
+                }
+
+                // 强制重新绑定所有可见项
+                adapter.notifyDataSetChanged()
+
+                // 三重 post 确保布局完成后再滚动
+                recyclerView.post {
+                    val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+                    // 使用 smoothScrollToPosition 确保滚动到底部
+                    layoutManager?.smoothScrollToPosition(recyclerView, null, lastIndex.coerceAtLeast(0))
+
+                    updateScrollBar()
+                    updateHighlight()
+                }
+            }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (hasWindowFocus) {
+            refreshList()
+        }
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        // 第一次布局就定下「这列够不够宽」，之后不再变，滚动条槽位才能稳定
+        val wide = width >= Values.screenWidth * 0.6f
+        if (wide != isWideList) {
+            isWideList = wide
+            recyclerParams.rightMargin = if (wide) DEFAULT_PADDING else 0
+            recyclerView.layoutParams = recyclerParams
+        }
+        if (changed) {
+            // 先量行高再刷新：刷新时会用行高算滚动条槽位，顺序反了首帧就没有滚动条
+            measureVisibleRows()
+            refreshList()
+        }
+    }
+
+    /** 量一次行高，把「一屏几行」算准，之后分页/滚动条/自动跟随都用它 */
+    private fun measureVisibleRows() {
+        if (measuredRows) return
+        // 首帧布局完成后直接同步算出行数，滚动条从第一帧就在正确位置；
+        // 之前只在 post 里算，首帧按 DEFAULT_MAX_SIZE 判成不需要滚动条，一滚才冒出来
+        val rowHeight = if (recyclerView.childCount > 0) recyclerView.getChildAt(0).height else 0
+        if (rowHeight > 0 && recyclerView.height > 0) {
+            rowHeightPx = rowHeight
+            updateScrollBar()
+            val rows = ((recyclerView.height + rowHeight - 1) / rowHeight).coerceAtLeast(1)
+            if (rows != visibleCount) {
+                visibleCount = rows
+                measuredRows = true
+                refreshList()
+            }
+            return
+        }
+        recyclerView.post {
+            if (recyclerView.childCount == 0) return@post
+            val rh = recyclerView.getChildAt(0).height
+            if (rh <= 0) return@post
+            rowHeightPx = rh
+            updateScrollBar()
+            val rows = ((recyclerView.height + rh - 1) / rh).coerceAtLeast(1)
+            if (rows != visibleCount) {
+                visibleCount = rows
+                measuredRows = true
+                refreshList()
+            }
+        }
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        Log.d("RecyclerListView", "onTouchEvent: action=${event.action}")
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                touchStartY = event.y
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val deltaY = event.y - touchStartY
+
+                if (Math.abs(deltaY) > SLIDE_PX) {
+                    if (deltaY < 0) {
+                        onSlide(1)
+                    } else {
+                        onSlide(-1)
+                    }
+                    touchStartY = event.y
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+            }
+        }
+        return true
+    }
+
+    // 触摸起始位置
+    private var interceptTouchStartY = 0f
+    private var isScrolling = false
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                interceptTouchStartY = event.y
+                isScrolling = false
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val deltaY = kotlin.math.abs(event.y - interceptTouchStartY)
+                // 如果移动距离超过阈值，拦截事件用于滑动
+                if (deltaY > 20) {
+                    isScrolling = true
+                    return true
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                // 触摸结束时重置滑动状态
+                isScrolling = false
+            }
+        }
+        return super.onInterceptTouchEvent(event)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        // 保证每次手势开始都重设基准点：之前 touchStartY 会残留上一次触摸的位置，
+        // 导致轻轻一划就按旧基准算出几十上百像素的位移，列表瞬间跳行
+        if (event.action == MotionEvent.ACTION_DOWN) {
+            touchStartY = event.y
+            interceptTouchStartY = event.y
+            isScrolling = false
+        }
+        if (isScrolling) {
+            // 滑动模式下，直接处理滑动事件
+            val handled = onTouchEvent(event)
+            // 滑动结束时重置状态
+            if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
+                isScrolling = false
+            }
+            return handled
+        }
+        // 非滑动模式，让子视图处理点击
+        return super.dispatchTouchEvent(event)
+    }
+
+    open fun onItemCreated(index: Int, itemView: ItemView) {
+        itemView.itemIndex = index
+        itemView.onItemClickListener = object : ItemView.OnItemClickListener {
+            override fun onItemClick(index: Int) {
+                this@RecyclerListView.index = index
+                onItemClick()
+            }
+        }
+    }
+
+    protected var index = 0
+    private var position = 0
+
+    var sorted = false
+
+    /**
+     * 是否画"选中条"。
+     * 「关于本机」这类只读信息页没有可进入的条目，选中条本身没有意义，
+     * 关掉以后整页就是干净的标签+数值，不会出现好几行同时像被选中。
+     */
+    var highlightEnabled = true
+    private var prevSlideTime = 0L
+    private var slideCount = 0
+
+    private var timer: Timer? = null
+
+    fun onSlide(direction: Int): Boolean {
+        Log.d("RecyclerListView", "onSlide dir=$direction index=$index size=${itemList.size}")
+        if (direction == 0 || itemList.isEmpty()) {
+            return false
+        }
+
+        if ((direction < 0 && index == 0) || (direction > 0 && index == itemList.size - 1)) {
+            return false
+        }
+
+        if (direction < 0) {
+            if (index > 0) {
+                if (position > 0 && index == position) {
+                    position--
+                }
+                index--
+            }
+        } else {
+            if (index < itemList.size - 1) {
+                if (itemList.size > visibleCount && index == position + visibleCount - 1) {
+                    position++
+                }
+                index++
+            }
+        }
+        refreshList()
+        // 选中条走出可视区时把列表跟过去：原来只看 position + MAX_SIZE，
+        // 而一屏实际能显示的行数常常少于 MAX_SIZE，多出来的条目就永远滚不到眼前。
+        ensureSelectionVisible()
+        return true
+    }
+
+    /** 让当前选中项滚进可视区（优先用实际可见的首尾行判断，不再假设一屏正好 MAX_SIZE 行） */
+    private fun ensureSelectionVisible() {
+        recyclerView.post {
+            val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
+            val first = lm.findFirstVisibleItemPosition()
+            val last = lm.findLastVisibleItemPosition()
+            if (first == RecyclerView.NO_POSITION || last == RecyclerView.NO_POSITION) return@post
+            if (index > last) {
+                recyclerView.smoothScrollToPosition(index)
+            } else if (index < first) {
+                recyclerView.scrollToPosition(index)
+            }
+        }
+    }
+
+    open fun onItemClick(): Boolean {
+        if (index >= itemList.size) {
+            return false
+        }
+        val result: Boolean? = if (itemList[index].onItemClickListener == null) {
+            defaultOnItemClickListener?.onItemClick(index, this)
+        } else {
+            itemList[index].onItemClickListener?.onItemClick(index, this)
+        }
+        refreshItem()
+        return result != null && result
+    }
+
+    open fun onItemLongClick(): Boolean {
+        if (index >= itemList.size) {
+            return false
+        }
+        val result: Boolean? = if (itemList[index].onItemClickListener == null) {
+            defaultOnItemClickListener?.onItemLongClick(index, this)
+        } else {
+            itemList[index].onItemClickListener?.onItemLongClick(index, this)
+        }
+        return result != null && result
+    }
+
+    fun size(): Int {
+        return itemList.size
+    }
+
+    private fun cancelTimer() {
+        timer?.cancel()
+        timer = null
+    }
+
+    var defaultOnItemClickListener: OnItemClickListener? = null
+
+    interface OnItemClickListener {
+        fun onItemClick(index: Int, listView: RecyclerListView): Boolean
+        fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+            return false
+        }
+    }
+
+    open class Item {
+        var name: String = ""
+        var onItemClickListener: OnItemClickListener? = null
+        var enable: Boolean = false
+        var rightText = ""
+
+        var extra: Any? = null
+
+        constructor(name: String, onItemClickListener: OnItemClickListener?, enable: Boolean) {
+            this.name = name
+            this.onItemClickListener = onItemClickListener
+            this.enable = enable
+        }
+
+        constructor(name: String, onItemClickListener: OnItemClickListener?, rightText: String) {
+            this.name = name
+            this.onItemClickListener = onItemClickListener
+            this.rightText = rightText
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (other !is Item) {
+                return false
+            }
+            return other.name == name && other.onItemClickListener == onItemClickListener && other.enable == enable && other.rightText == rightText
+        }
+
+        override fun hashCode(): Int {
+            return name.hashCode()
+        }
+    }
+
+    // RecyclerView Adapter
+    private inner class ItemAdapter : RecyclerView.Adapter<ItemViewHolder>() {
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ItemViewHolder {
+            val itemView = ItemView(context)
+            // 设置 item 宽度为 match_parent
+            itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT)
+            return ItemViewHolder(itemView)
+        }
+
+        override fun onBindViewHolder(holder: ItemViewHolder, listPosition: Int) {
+            val actualIndex = position + listPosition
+            if (actualIndex < itemList.size) {
+                val item = itemList[actualIndex]
+                // 判断是否显示滚动条（item 数量大于 MAX_SIZE 时显示）
+                val showScrollBar = scrollBarVisible
+                holder.bind(item, highlightEnabled && actualIndex == index, item.enable, item.rightText, showScrollBar)
+                // 设置 item 的点击监听
+                onItemCreated(actualIndex, holder.itemView as ItemView)
+            }
+        }
+
+        override fun getItemCount(): Int {
+            return minOf(visibleCount, itemList.size - position).coerceAtLeast(0)
+        }
+    }
+
+    inner class ItemViewHolder(private val listItemView: ItemView) : RecyclerView.ViewHolder(listItemView) {
+        fun bind(item: Item, isHighlighted: Boolean, isEnabled: Boolean, rightText: String, showScrollBar: Boolean = true) {
+            listItemView.setText(item.name)
+            listItemView.setHighlight(isHighlighted)
+            listItemView.setEnable(isEnabled)
+            listItemView.setRightText(rightText, showScrollBar)
+        }
+
+        fun setHighlight(highlight: Boolean) {
+            listItemView.setHighlight(highlight)
+        }
+    }
+
+    private class ScrollBar(context: Context) : ViewGroup(context) {
+        private var position = 0
+        private var maxSize = 0
+        var size = 0
+
+        private val paint by lazy { Paint() }
+        private val shader by lazy {
+            Colors.getShader(
+                width / 1.8f,
+                0f,
+                width.toFloat(),
+                0f,
+                Colors.background_dark_2,
+                Colors.background_dark_1
+            )
+        }
+
+        fun setScrollBar(position: Int, maxSize: Int, size: Int) {
+            this.position = position
+            this.maxSize = maxSize
+            this.size = size
+            refresh()
+        }
+
+        private fun refresh() {
+            if (size > maxSize) {
+                var barHeight = measuredHeight * maxSize / size
+                if (barHeight == 0) {
+                    barHeight = 1
+                }
+                val barTop = measuredHeight * position / size
+                bar.layout(Values.LINE_WIDTH, barTop, measuredWidth, barTop + barHeight)
+                visibility = VISIBLE
+            } else {
+                visibility = GONE
+            }
+        }
+
+        override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+            refresh()
+        }
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            setMeasuredDimension(DEFAULT_PADDING, MeasureSpec.getSize(heightMeasureSpec))
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+
+            paint.shader = shader
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+
+            paint.shader = null
+            paint.color = Colors.line
+            canvas.drawRect(0f, 0f, Values.LINE_WIDTH.toFloat(), measuredHeight.toFloat(), paint)
+        }
+
+        private val bar = object : View(context) {
+            private val paint by lazy {
+                Paint().apply {
+                    shader = null
+                    isAntiAlias = true
+                }
+            }
+
+            // 圆角半径
+            private val cornerRadius = 8f
+
+            override fun onDraw(canvas: Canvas) {
+                if (paint.shader == null) {
+                    paint.shader = Colors.getShader(
+                        width / 2f,
+                        0f,
+                        width.toFloat(),
+                        0f,
+                        Colors.main,
+                        Colors.main_light,
+                        Shader.TileMode.MIRROR
+                    )
+                }
+                // 使用圆角矩形绘制高亮条
+                canvas.drawRoundRect(
+                    0f, 0f, width.toFloat(), height.toFloat(),
+                    cornerRadius, cornerRadius, paint
+                )
+            }
+        }
+
+        init {
+            visibility = GONE
+            setBackgroundColor(Colors.background)
+            addView(bar)
+        }
+    }
+
+    class ItemView(context: Context) : FrameLayout(context) {
+
+        private var highlight = false
+        private var enable = false
+        private var playing = false
+
+        private val rightText = TextView(context)
+        private val leftText = TextView(context)
+        
+        companion object {
+            private const val RIGHT_TEXT_MAX_WIDTH_DP = 110f
+        }
+        
+        var onItemClickListener: OnItemClickListener? = null
+        var itemIndex = -1
+        
+        private var touchStartX = 0f
+        private var touchStartY = 0f
+        
+        private var rightTextWidth = 0
+        private var rightTextHeight = 0
+
+        init {
+            val density = context.resources.displayMetrics.density
+            // 固定右边距，给 rightText 留出空间（约 60dp 足够显示时间格式 05:00）
+            val rightTextAreaWidth = (RIGHT_TEXT_MAX_WIDTH_DP * density).toInt()
+            
+            // rightText 宽度自适应，靠右对齐
+            val layoutParams2 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+            layoutParams2.gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+            layoutParams2.rightMargin = DEFAULT_PADDING
+            
+            // leftText 占据剩余空间，右侧留出固定区域给 rightText
+            val layoutParams1 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            layoutParams1.rightMargin = rightTextAreaWidth + DEFAULT_PADDING * 2
+
+            leftText.setSingleLine()
+            rightText.setSingleLine()
+            // 不放省略号，直接截断
+            leftText.ellipsize = null
+            rightText.ellipsize = android.text.TextUtils.TruncateAt.END
+            rightText.maxWidth = rightTextAreaWidth
+            rightText.visibility = View.VISIBLE
+            rightText.setPadding(DEFAULT_PADDING / 4, DEFAULT_PADDING / 4, DEFAULT_PADDING / 4, DEFAULT_PADDING / 4)
+            rightText.textSize = 14f
+            rightText.typeface = android.graphics.Typeface.MONOSPACE
+            rightText.setBackgroundColor(0x00000000)
+            rightText.setTextColor(Colors.text)
+            // 文本在 TextView 内右对齐
+            rightText.gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+            addView(leftText, layoutParams1)
+            addView(rightText, layoutParams2)
+            
+            setOnClickListener {
+                onItemClickListener?.onItemClick(itemIndex)
+            }
+        }
+        
+        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+            super.onLayout(changed, left, top, right, bottom)
+            // 手动布局 rightText，确保它紧贴右边（留出滚动条空间）
+            if (rightText.visibility != View.GONE && rightTextWidth > 0 && rightTextHeight > 0) {
+                val parentWidth = width
+                val parentHeight = height
+                val right = parentWidth - DEFAULT_PADDING
+                val leftPos = right - rightTextWidth
+                val topPos = (parentHeight - rightTextHeight) / 2
+                val bottomPos = topPos + rightTextHeight
+                rightText.layout(leftPos, topPos, right, bottomPos)
+            }
+        }
+        
+        interface OnItemClickListener {
+            fun onItemClick(index: Int)
+        }
+
+        // 高亮背景圆角矩形
+        private val highlightDrawable by lazy {
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 8f * context.resources.displayMetrics.density
+                setColor(Colors.main)
+            }
+        }
+
+        fun setHighlight(highlight: Boolean) {
+            if (this.highlight == highlight) {
+                // 状态没变也把背景再确认一次：RecyclerView 复用 item 时，
+                // 上一次残留的深色选中条会被带到新行上（「关于本机」整页都变深条就是这个原因）
+                if (!highlight && background != null) {
+                    background = null
+                }
+                return
+            }
+            this.highlight = highlight
+            // 选中项不启用跑马灯，长名称直接截断，保持画面稳定
+            leftText.scrollable = false
+            if (highlight) {
+                leftText.isSelected = true
+            } else {
+                leftText.isSelected = false
+            }
+            if (highlight) {
+                // 应用玻璃效果高亮背景
+                applyHighlightGlassEffect()
+                leftText.setTextColor(Colors.selected_text)
+                rightText.setTextColor(Colors.selected_text)
+            } else {
+                background = null
+                leftText.setTextColor(Colors.text)
+                rightText.setTextColor(Colors.text)
+            }
+        }
+
+        // 应用高亮玻璃效果 - 半透明蓝色背景+光泽
+        private fun applyHighlightGlassEffect() {
+            // 使用半透明蓝色背景模拟玻璃效果
+            val glassDrawable = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 8f * context.resources.displayMetrics.density
+                // 深褐黑选中条，配白字，在金色背景上对比明显
+                colors = intArrayOf(
+                    Colors.ipod_selected_top,
+                    Colors.ipod_selected_bottom
+                )
+                orientation = GradientDrawable.Orientation.TOP_BOTTOM
+            }
+            background = glassDrawable
+        }
+
+        fun setEnable(enable: Boolean) {
+            if (this.enable == enable) {
+                return
+            }
+            this.enable = enable
+        }
+
+        fun setPlaying(playing: Boolean) {
+            if (this.playing == playing) {
+                return
+            }
+            this.playing = playing
+        }
+
+        fun setText(text: String) {
+            leftText.text = text
+        }
+
+        fun setRightText(text: String, showScrollBar: Boolean = true) {
+            rightText.text = text
+            val layoutParams = leftText.layoutParams as FrameLayout.LayoutParams
+            if (text.isEmpty()) {
+                rightText.visibility = View.GONE
+                rightTextWidth = 0
+                rightTextHeight = 0
+                // 没有 rightText 时，根据是否显示滚动条设置边距
+                layoutParams.rightMargin = if (showScrollBar) DEFAULT_PADDING else 0
+                leftText.layoutParams = layoutParams
+            } else {
+                rightText.visibility = View.VISIBLE
+                // 测量 rightText 的实际宽高
+                rightText.measure(
+                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+                )
+                rightTextWidth = rightText.measuredWidth
+                rightTextHeight = rightText.measuredHeight
+                // 有 rightText 时，根据实际宽度和是否显示滚动条设置边距
+                val scrollBarMargin = if (showScrollBar) DEFAULT_PADDING * 2 else DEFAULT_PADDING
+                layoutParams.rightMargin = rightTextWidth + scrollBarMargin
+                leftText.layoutParams = layoutParams
+                // 请求重新布局以更新 rightText 位置
+                requestLayout()
+            }
+            // 颜色由 setHighlight 统一管理
+        }
+
+        private var shakeCount = 0
+        private var shakeTimer: Timer? = null
+        fun shake() {
+            if (shakeTimer == null) {
+                shakeTimer = Timer()
+                shakeTimer?.schedule(object : TimerTask() {
+                    override fun run() {
+                        shakeCount++
+                        ThreadUtil.runOnUiThread { setHighlight(!highlight) }
+                        if (shakeCount == 4) {
+                            cancelShake()
+                        }
+                    }
+                }, 100, 100)
+            }
+        }
+
+        private fun cancelShake() {
+            shakeTimer?.cancel()
+            shakeTimer = null
+            shakeCount = 0
+        }
+
+        fun clear() {
+            cancelShake()
+
+            leftText.clear()
+            rightText.clear()
+
+            highlight = false
+            enable = false
+            playing = false
+
+            background = null
+            leftText.setTextColor(Colors.text)
+            rightText.setTextColor(Colors.text)
+        }
+    }
+}

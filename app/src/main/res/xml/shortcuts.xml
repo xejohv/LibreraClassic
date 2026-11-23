@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_play_arrow_blue_500_18dp"
+        android:shortcutId="shuffle_play"
+        android:shortcutLongLabel="@string/shuffle_play"
+        android:shortcutShortLabel="@string/shuffle_play">
+
+        <intent
+            android:action="action_shuffle"
+            android:targetClass="io.github.xejohv.podclassicxzs.activity.MainActivity"
+            android:targetPackage="io.github.xejohv.podclassicxzs" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+</shortcuts>
