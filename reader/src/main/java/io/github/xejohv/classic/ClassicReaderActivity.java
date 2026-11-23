@@ -43,6 +43,8 @@ public class ClassicReaderActivity extends Activity {
     /** 0 = 最近（打开过的），1 = 全部，2 = 回收站。 */
     private int mode = 1;
     private final TextView[] segTabs = new TextView[3];
+    /** 顶栏右上角的「导入」：把 Download 里的电子书搬进 Download/Books。 */
+    private TextView importBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,6 +99,19 @@ public class ClassicReaderActivity extends Activity {
             @Override public void onClick(View v) { finishToMusic(); }
         });
         bar.addView(back, new FrameLayout.LayoutParams(-2, -1, Gravity.LEFT));
+
+        // 右上角：一键把 Download 里的电子书搬进书库
+        TextView imp = new TextView(this);
+        imp.setTextColor(Color.parseColor(COL_RED));
+        imp.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(15));
+        imp.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        imp.setPadding(dp(10), 0, dp(16), 0);
+        imp.setBackground(selector());
+        imp.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { startImport(); }
+        });
+        bar.addView(imp, new FrameLayout.LayoutParams(-2, -1, Gravity.RIGHT));
+        importBtn = imp;
 
         column.addView(bar, new LinearLayout.LayoutParams(-1, dp(56)));
         View line = new View(this);
@@ -156,6 +171,7 @@ public class ClassicReaderActivity extends Activity {
         File rootDir = roots.get(0);
         listBox.removeAllViews();
         paintTabs();
+        refreshImportLabel();
         // 回收站：满 7 天的在这里清掉，剩下的按删除时间列出
         io.github.xejohv.classic.Trash.purge();
         if (mode == 2) {
@@ -662,6 +678,113 @@ public class ClassicReaderActivity extends Activity {
             home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
             startActivity(home);
         } catch (Throwable ignored) {
+        }
+    }
+
+    /** 电脑上能正常打开的落书位置：Download 根目录（MTP 里就是普通文件夹）。 */
+    private static File downloadDir() {
+        return new File(Environment.getExternalStorageDirectory(), "Download");
+    }
+
+    /** Download 根目录里还没搬进书库、但阅读器认得的所有电子书。 */
+    private static List<File> pendingInDownload() {
+        List<File> out = new ArrayList<>();
+        File[] all = downloadDir().listFiles();
+        if (all == null) return out;
+        for (File f : all) {
+            if (f.isDirectory()) continue;
+            if (org.ebookdroid.BookType.isSupportedExtByPath(f.getName())) out.add(f);
+        }
+        Collections.sort(out, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        return out;
+    }
+
+    private void refreshImportLabel() {
+        if (importBtn == null) return;
+        int n = pendingInDownload().size();
+        importBtn.setText(n > 0 ? t("导入 " + n, "Import " + n) : t("导入", "Import"));
+        importBtn.setTextColor(Color.parseColor(n > 0 ? COL_RED : COL_DIM));
+    }
+
+    private void startImport() {
+        final List<File> pending = pendingInDownload();
+        if (pending.isEmpty()) {
+            toast(t("Download 里没有可导入的电子书", "No e-books in Download"));
+            return;
+        }
+        podAlert(t("导入 " + pending.size() + " 本书？", "Import " + pending.size() + " book(s)?"),
+                t("会从 Download 移进 Download/Books，然后出现在书架上。同名文件自动加序号。",
+                        "They move from Download into Download/Books and show up on the shelf. Same-name files get a number."),
+                t("导入", "Import"), false,
+                new Runnable() {
+                    @Override public void run() {
+                        int ok = doImport(pending);
+                        toast(ok > 0 ? t("已导入 " + ok + " 本", "Imported " + ok) : t("导入失败：文件被占用或没有权限", "Import failed: file in use or not permitted"));
+                        reload();
+                    }
+                });
+    }
+
+    /** 搬书：先改名，跨卷改不动就拷贝再删；最后按新位置重新登记媒体库。 */
+    private int doImport(List<File> pending) {
+        File books = roots.get(0);
+        if (!books.isDirectory() && !books.mkdirs()) {
+            books = new File(Environment.getExternalStorageDirectory(), "Books");
+            books.mkdirs();
+        }
+        int ok = 0;
+        for (File src : pending) {
+            File dst = uniqueIn(books, src.getName());
+            if (moveFile(src, dst)) {
+                ok++;
+                try {
+                    android.media.MediaScannerConnection.scanFile(this,
+                            new String[]{src.getAbsolutePath(), dst.getAbsolutePath()}, null, null);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        return ok;
+    }
+
+    private static File uniqueIn(File dir, String name) {
+        File f = new File(dir, name);
+        if (!f.exists()) return f;
+        int dot = name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        String tail = dot > 0 ? name.substring(dot) : "";
+        for (int i = 1; i < 1000; i++) {
+            f = new File(dir, base + " (" + i + ")" + tail);
+            if (!f.exists()) return f;
+        }
+        return f;
+    }
+
+    private static boolean moveFile(File src, File dst) {
+        if (src.renameTo(dst)) return true;
+        java.io.InputStream in = null;
+        java.io.OutputStream out = null;
+        try {
+            in = new java.io.FileInputStream(src);
+            out = new java.io.FileOutputStream(dst);
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            out.flush();
+        } catch (Throwable t) {
+            try { dst.delete(); } catch (Throwable ignored) {
+            }
+            return false;
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignored) {
+            }
+            try { if (out != null) out.close(); } catch (Throwable ignored) {
+            }
+        }
+        try {
+            return src.delete();
+        } catch (Throwable t) {
+            return false;
         }
     }
 

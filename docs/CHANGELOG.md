@@ -1,3 +1,11 @@
+## v1.22 (vc26) — 2026-11-23 23:10
+
+- 书库顶栏右上角新增「导入」：Android 的 MTP 在 Android 8 上无法把自建目录稳定显示成文件夹（`Download/Books` 即使索引行 `format=12289`/`mime_type=vnd.android.document/directory` 也可能被画成空白文件），于是改走用户路线——**电子书丢进 `Download` 根目录**（这个系统目录在电脑上永远是正常文件夹），在书库里点「导入 N」一键搬进 `Download/Books`。
+- 导入逻辑：扫 `Download` 根目录（不递归、跳过子目录）里所有阅读器认得格式（走 `BookType.isSupportedExtByPath`，与书架同一张格式表）；弹苹果风确认卡「导入 N 本书？」→ 移文件（先 `renameTo`，跨卷失败则拷贝再删；同名自动加 `(n)`）→ `MediaScannerConnection.scanFile` 同时登记新旧路径 → 重载书架并提示「已导入 N 本」。
+- 按钮自带计数：Download 里有几本可导入的书就显示「导入 N」，没有时是灰色的「导入」，点一下只提示「Download 里没有可导入的电子书」。
+- 真机验证：用户丢进 Download 的《亚历山大·汉密尔顿 等：联邦党人文集》epub（548 KB）点「导入 1」→ 确认 → 文件落到 `Download/Books`，书架第一行出现该书、封面正常，Download 根目录只剩 `Books` 文件夹。
+- 版本：versionCode 26 / versionName 1.22。
+
 ## v1.21 (vc25) — 2026-11-23 22:50
 
 - 书库根目录搬到 MTP 能正常显示的二级目录 `Download/Books`。原因是 Android 的 MTP 读的是 MediaProvider 索引而不是文件系统：根目录自建的文件夹（`/sdcard/Books`）即使把媒体库行 `mime_type` 改成 `vnd.android.document/directory`，Windows 资源管理器依旧把它画成一张空白纸文件；只有系统原有目录（Download 等）下面新建的二级目录才会正常显示为文件夹。
