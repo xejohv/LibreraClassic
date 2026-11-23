@@ -229,10 +229,12 @@ class RecordView(context: Context) : RecyclerListView(context, 10), ScreenView {
             Item(Strings.DELETE, object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     try {
+                        // 录音不走回收站：删掉即彻底删除（用户明确要求）
                         file.delete()
                         MediaScannerConnection.scanFile(
                             context, arrayOf(file.absolutePath), arrayOf("audio/mp4"), null
                         )
+                        Toast.makeText(context, Strings.DELETE, Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) {
                     }
                     // 正在播这首录音时先停掉并从播放列表摘掉，避免之后拿已删文件读封面/时长而闪退

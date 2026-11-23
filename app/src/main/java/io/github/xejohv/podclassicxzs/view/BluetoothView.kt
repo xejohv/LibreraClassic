@@ -42,7 +42,7 @@ class BluetoothView(context: Context) : RecyclerListView(context), ScreenView {
     }
 
     init {
-        rowSwitch = Item("蓝牙", object : OnItemClickListener {
+        rowSwitch = Item(io.github.xejohv.podclassicxzs.values.Strings.BLUETOOTH, object : OnItemClickListener {
             override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                 if (!accept()) {
                     return true
@@ -113,7 +113,7 @@ class BluetoothView(context: Context) : RecyclerListView(context), ScreenView {
 
     override fun slide(slideVal: Int): Boolean = onSlide(slideVal)
 
-    override fun getTitle(): String? = "蓝牙"
+    override fun getTitle(): String? = io.github.xejohv.podclassicxzs.values.Strings.BLUETOOTH
 
     override fun onViewAdd() {
         try {

@@ -16,6 +16,8 @@ object Strings {
     var INTERNAL_STORAGE: String = ""
     var SDCARD: String = ""
     var SETTINGS: String = ""
+    var CAMERA: String = ""
+    var BLUETOOTH: String = ""
     var SHUFFLE_PLAY: String = ""
     var NOW_PLAYING: String = ""
     var CURRENT_PLAYLIST: String = ""
@@ -55,6 +57,7 @@ object Strings {
     var QUALITY_LOW: String = ""
     var DELETE_RECORD: String = ""
     var DELETE: String = ""
+    var TRASH_MOVED: String = ""
     var MIC_PERMISSION: String = ""
     var RECORD_EMPTY: String = ""
     var RECORD_HINT: String = ""
@@ -121,6 +124,8 @@ object Strings {
             BOOKS = getString(R.string.books)
             EXTRA_APPLICATION = getString(R.string.extra_application)
             SETTINGS = getString(R.string.settings)
+            CAMERA = getString(R.string.camera)
+            BLUETOOTH = getString(R.string.bluetooth)
             SHUFFLE_PLAY = getString(R.string.shuffle_play)
             NOW_PLAYING = getString(R.string.now_playing)
             FILE = getString(R.string.file)
@@ -187,6 +192,7 @@ object Strings {
 
             DELETE_RECORD = getString(R.string.delete_record)
             DELETE = getString(R.string.delete)
+            TRASH_MOVED = getString(R.string.trash_moved)
             MIC_PERMISSION = getString(R.string.mic_permission)
             RECORD_EMPTY = getString(R.string.record_empty)
             RECORD_HINT = getString(R.string.record_hint)

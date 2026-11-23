@@ -1,3 +1,20 @@
+## v1.21 (vc25) — 2026-11-23 22:50
+
+- 书库根目录搬到 MTP 能正常显示的二级目录 `Download/Books`。原因是 Android 的 MTP 读的是 MediaProvider 索引而不是文件系统：根目录自建的文件夹（`/sdcard/Books`）即使把媒体库行 `mime_type` 改成 `vnd.android.document/directory`，Windows 资源管理器依旧把它画成一张空白纸文件；只有系统原有目录（Download 等）下面新建的二级目录才会正常显示为文件夹。
+- 代码改动：`ClassicReaderActivity.onCreate` 的 `roots` 改为 `Download/Books` → `Books` → `Documents/Books`（后两处仅做旧位置兼容）；`PodSkin` 目录行与提示文案同步为 `/sdcard/Download/Books`、「把 EPUB / PDF / TXT 放进 Download/Books 文件夹」。
+- 真机已把四本书搬进 `/storage/emulated/0/Download/Books`，删除 `/sdcard/Books`、`/sdcard/Documents`（含 `Documents/Books`）；媒体库用显式组件扫描重建了目录行与四个文件行（目录行 `_id=3863` 已 UPDATE 成 directory）。
+- 教训备忘：媒体库扫描只能 `am broadcast -n com.android.providers.media/.MediaScannerReceiver -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://<绝对路径>`，整卷广播、`MEDIA_MOUNTED`、`content call scan_volume` 都不生效或被 SecurityException 拒；`content delete` 宽条件会连带删磁盘文件，禁用。
+- 版本：versionCode 25 / versionName 1.21。
+
+## v1.20 (vc24) — 2026-11-23 22:15
+
+- 语言切换真正生效（三层根因一起修）：① `app/build.gradle` 的 `resourceConfigurations` 原来只白名单 `zh-rCN`/`en`，`values-en-rUS`、`values-zh-rTW` 在打包阶段被筛掉，APK 里根本没有英文条目（`aapt2 dump resources` 实证 en 条目 0）；补成 `['zh-rCN','zh-rTW','en-rUS','en']`。② `Strings` 的静态字段只在 Application 启动时 init 一次，`recreate()` 不重取；`MainActivity.onCreate` 里补 `Strings.init()`。③ 弃用自造 `attachBaseContext` 包装，改走 AndroidX 应用级语言 `AppCompatDelegate.setApplicationLocales`（manifest 加 `AppLocalesMetadataHolderService`、`autoStoreLocales=true`），冷启动与就地热切换都跟随偏好。真机中↔英双向即点即变，无需重启。
+- 英文界面补译：侧栏 Photo/Video/File/Extra Apps、Shuffle 缩短避免截断；新增 camera/bluetooth/trash_moved 四语言资源；附加程序（录音/主题/相机/蓝牙）与相机、蓝牙页标题改走 `Strings`;书库、回收站、确认框全部按 `Locale` 双语。
+- 新增回收站（仅电子书）：`reader/.../Trash.java` 落在 `/sdcard/.PodClassicTrash/<毫秒>/`，内含原文件 + `meta.txt`（原路径与删除时间），保留 7 天；书库第三段「回收站」列出待删书（显示「还剩 N 天」），点一下恢复（同名自动加序号），长按立刻彻底删除；满 7 天自动清理，`reload()` 时先 `purge()`。书库行新增长按删除，确认框换成自制苹果风卡片（奶油底、圆角、发丝线、红色破坏性按钮）。
+- 列表长按派发补上：`RecyclerListView` 之前只派发点击，`RecordView` 的长按删除等于死代码；新增 `OnItemLongClickListener` 并在 `ItemView` 上挂 `setOnLongClickListener`。
+- 录音/音乐删除按用户要求**不进回收站**，仍然是直接删除（回收站只针对电子图书）。
+- 版本：versionCode 24 / versionName 1.20。
+
 ## v1.19 (vc23) — 2026-11-23 21:00
 
 - 书库换木纹书架（`io.github.xejohv.classic.WoodBackdrop`）：运行时画一块胡桃木位图（横向细木纹 + 三处节疤 + 四角压暗），只在尺寸变化时重画一次；配色整组换成暖系——暖白标题、奶油药丸分段控件、羊皮纸卡片、深棕卡内文字。音乐界面没动，仍是原来的黑/红 iPod 皮肤。

@@ -238,7 +238,7 @@ public final class PodSkin {
         col.setPadding(dp(a, 20), dp(a, 12), dp(a, 20), dp(a, 16));
 
         col.addView(caption(a, "书库"));
-        col.addView(row(a, "图书目录", "/sdcard/Books"));
+        col.addView(row(a, "图书目录", "/sdcard/Download/Books"));
         col.addView(line(a));
 
         col.addView(caption(a, "关于"));
@@ -246,7 +246,7 @@ public final class PodSkin {
         col.addView(line(a));
 
         TextView note = new TextView(a);
-        note.setText("把 EPUB / PDF / TXT 放进 Books 文件夹，回到阅读会自动出现。");
+        note.setText("把 EPUB / PDF / TXT 放进 Download/Books 文件夹，回到阅读会自动出现。");
         note.setTextColor(MUTED);
         note.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(a, 13));
         note.setPadding(0, dp(a, 18), 0, 0);

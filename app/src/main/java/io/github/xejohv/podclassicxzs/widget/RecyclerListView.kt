@@ -498,6 +498,12 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 onItemClick()
             }
         }
+        itemView.onItemLongClickListener = object : ItemView.OnItemLongClickListener {
+            override fun onItemLongClick(index: Int): Boolean {
+                this@RecyclerListView.index = index
+                return onItemLongClick()
+            }
+        }
     }
 
     protected var index = 0
@@ -787,6 +793,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         }
         
         var onItemClickListener: OnItemClickListener? = null
+        var onItemLongClickListener: OnItemLongClickListener? = null
         var itemIndex = -1
         
         private var touchStartX = 0f
@@ -829,6 +836,10 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             setOnClickListener {
                 onItemClickListener?.onItemClick(itemIndex)
             }
+            setOnLongClickListener {
+                val l = onItemLongClickListener
+                if (l != null && l.onItemLongClick(itemIndex)) true else false
+            }
         }
         
         override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -847,6 +858,12 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         
         interface OnItemClickListener {
             fun onItemClick(index: Int)
+        }
+
+        /** 长按条目（例如录音页：长按删除）。之前 RecyclerListView 根本没派发过长按，
+         *  RecordView 里那段长按删除等于是死代码。 */
+        interface OnItemLongClickListener {
+            fun onItemLongClick(index: Int): Boolean
         }
 
         // 高亮背景圆角矩形

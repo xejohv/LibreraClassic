@@ -85,6 +85,9 @@ class MainActivity : AppCompatActivity() {
         } catch (ignored: Exception) {
         }
         initScreen()
+        // 语言切换后 Activity 会原地重建，Strings 的静态文案得重新取一遍，
+        // 否则资源已经是新语言，菜单上还挂着上一次的中文
+        io.github.xejohv.podclassicxzs.values.Strings.init()
         setContentView(R.layout.activity_main)
         // 恢复上次的屏幕亮度（自动档不覆盖系统亮度）
         BrightnessUtil.apply(this)

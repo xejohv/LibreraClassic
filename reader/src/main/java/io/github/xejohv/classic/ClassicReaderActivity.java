@@ -37,17 +37,22 @@ public class ClassicReaderActivity extends Activity {
     private static final String COL_ARROW = "#A38A6C";
     private static final String COL_STAT = "#F2E1C4";
 
-    /** One folder, decided here: everything the reader shows lives in /sdcard/Books. */
+    /** One folder, decided here: everything the reader shows lives in /sdcard/Download/Books (plus旧位置兼容). */
     private final List<File> roots = new ArrayList<>();
     private LinearLayout listBox;
-    /** 0 = 最近（打开过的），1 = 全部。 */
+    /** 0 = 最近（打开过的），1 = 全部，2 = 回收站。 */
     private int mode = 1;
-    private final TextView[] segTabs = new TextView[2];
+    private final TextView[] segTabs = new TextView[3];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // MTP 根目录不支持“新建文件夹”（自建目录会被登记成普通文件、在电脑上只显示一个空白图标），
+        // 所以书库挂在系统已有的 Download 下面的二级文件夹：Download/Books，电脑上能正常进。
+        roots.add(new File(Environment.getExternalStorageDirectory(), "Download/Books"));
+        // 兼容旧位置：根目录 Books、Documents/Books 里的书也照样能被看到
         roots.add(new File(Environment.getExternalStorageDirectory(), "Books"));
+        roots.add(new File(Environment.getExternalStorageDirectory(), "Documents/Books"));
         setContentView(buildUi());
         PodSkin.disableSoftKeyboard(this);
         PodCovers.prune(this);
@@ -75,7 +80,7 @@ public class ClassicReaderActivity extends Activity {
         bar.setBackgroundColor(Color.TRANSPARENT);
 
         TextView title = new TextView(this);
-        title.setText("阅读");
+        title.setText(t("阅读", "Books"));
         title.setTextColor(Color.parseColor(COL_TEXT));
         title.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(17));
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -83,7 +88,7 @@ public class ClassicReaderActivity extends Activity {
         bar.addView(title, new FrameLayout.LayoutParams(-1, -1));
 
         TextView back = new TextView(this);
-        back.setText("\u2039 音乐");
+        back.setText(t("\u2039 音乐", "\u2039 Music"));
         back.setTextColor(Color.parseColor(COL_RED));
         back.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(16));
         back.setGravity(Gravity.CENTER_VERTICAL);
@@ -110,15 +115,15 @@ public class ClassicReaderActivity extends Activity {
         track.setBackground(trackBg);
         track.setPadding(dp(2), dp(2), dp(2), dp(2));
 
-        String[] names = {"最近", "全部"};
-        for (int i = 0; i < 2; i++) {
+        String[] names = {t("最近", "Recent"), t("全部", "All"), t("回收站", "Trash")};
+        for (int i = 0; i < 3; i++) {
             final int which = i;
             TextView tab = new TextView(this);
             tab.setText(names[i]);
             tab.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(13));
             tab.setGravity(Gravity.CENTER);
-            tab.setMinWidth(dp(74));
-            tab.setPadding(dp(10), dp(6), dp(10), dp(6));
+            tab.setMinWidth(dp(56));
+            tab.setPadding(dp(8), dp(6), dp(8), dp(6));
             tab.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
                     if (mode != which) {
@@ -151,6 +156,12 @@ public class ClassicReaderActivity extends Activity {
         File rootDir = roots.get(0);
         listBox.removeAllViews();
         paintTabs();
+        // 回收站：满 7 天的在这里清掉，剩下的按删除时间列出
+        io.github.xejohv.classic.Trash.purge();
+        if (mode == 2) {
+            renderTrash();
+            return;
+        }
         List<File> files = new ArrayList<>();
         collect(rootDir, files);
 
@@ -186,14 +197,15 @@ public class ClassicReaderActivity extends Activity {
             empty.setPadding(dp(8), dp(70), dp(8), dp(8));
 
             TextView head = new TextView(this);
-            head.setText(mode == 0 ? "还没有在读的书" : "没有找到书");
+            head.setText(mode == 0 ? t("还没有在读的书", "Nothing in progress") : t("没有找到书", "No books found"));
             head.setTextColor(Color.parseColor(COL_TEXT));
             head.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(17));
             head.setGravity(Gravity.CENTER);
             empty.addView(head, new LinearLayout.LayoutParams(-1, -2));
 
             TextView hint = new TextView(this);
-            hint.setText(mode == 0 ? "打开一本书，它就会出现在这里" : "把电子书放进 " + rootDir.getName() + " 文件夹");
+            hint.setText(mode == 0 ? t("打开一本书，它就会出现在这里", "Open a book and it shows up here")
+                    : t("把电子书放进 " + rootDir.getName() + " 文件夹", "Drop e-books into the " + rootDir.getName() + " folder"));
             hint.setTextColor(Color.parseColor(COL_DIM));
             hint.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(13));
             hint.setGravity(Gravity.CENTER);
@@ -220,7 +232,7 @@ public class ClassicReaderActivity extends Activity {
         long today = todayRead();
         if (today >= 60) {
             TextView stat = new TextView(this);
-            stat.setText("今天读了 " + (today / 60) + " 分钟");
+            stat.setText(t("今天读了 " + (today / 60) + " 分钟", "Read " + (today / 60) + " min today"));
             stat.setTextColor(Color.parseColor(COL_STAT));
             stat.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(12));
             stat.setGravity(Gravity.CENTER);
@@ -327,7 +339,250 @@ public class ClassicReaderActivity extends Activity {
         wrap.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { open(f); }
         });
+        // 长按不是菜单，是删除：删之前问一句，删之后进回收站，7 天内都捞得回来
+        wrap.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override public boolean onLongClick(View v) {
+                confirmTrash(f);
+                return true;
+            }
+        });
         return wrap;
+    }
+
+    private void confirmTrash(final File f) {
+        podAlert(t("移到回收站？", "Move to Trash?"),
+                t("《" + title(f) + "》会移进回收站，7 天后自动删除；这段时间里可以在「回收站」里恢复。",
+                        "《" + title(f) + "》 will move to Trash and be deleted in 7 days. You can restore it from Trash meanwhile."),
+                t("移到回收站", "Move to Trash"), true,
+                new Runnable() {
+                    @Override public void run() {
+                        File slot = io.github.xejohv.classic.Trash.moveIn(f);
+                        toast(slot == null ? t("删除失败：文件被占用或没有权限", "Could not delete: file is in use or not permitted") : t("已移到回收站，7 天后删除", "Moved to Trash. Removed after 7 days"));
+                        reload();
+                    }
+                });
+    }
+
+    /** 回收站列表：点按恢复，长按立刻删除。 */
+    private void renderTrash() {
+        java.util.List<File> items = io.github.xejohv.classic.Trash.list();
+        View spacer = new View(this);
+        spacer.setBackgroundColor(Color.TRANSPARENT);
+        listBox.addView(spacer, new LinearLayout.LayoutParams(-1, dp(8)));
+
+        if (items.isEmpty()) {
+            TextView head = new TextView(this);
+            head.setText(t("回收站是空的", "Trash is empty"));
+            head.setTextColor(Color.parseColor(COL_TEXT));
+            head.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(17));
+            head.setGravity(Gravity.CENTER);
+            head.setPadding(dp(8), dp(70), dp(8), 0);
+            listBox.addView(head, new LinearLayout.LayoutParams(-1, -2));
+
+            TextView hint = new TextView(this);
+            hint.setText(t("在书库里长按一本书，就会移到这里", "Long-press a book in the library to move it here"));
+            hint.setTextColor(Color.parseColor(COL_DIM));
+            hint.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(13));
+            hint.setGravity(Gravity.CENTER);
+            hint.setPadding(dp(8), dp(8), dp(8), 0);
+            listBox.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+            return;
+        }
+
+        LinearLayout card = card();
+        for (int i = 0; i < items.size(); i++) {
+            if (i > 0) {
+                View d = new View(this);
+                d.setBackgroundColor(Color.parseColor(COL_SEP));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(1));
+                lp.leftMargin = dp(16);
+                card.addView(d, lp);
+            }
+            card.addView(trashRow(items.get(i)), new LinearLayout.LayoutParams(-1, -2));
+        }
+        listBox.addView(card, card.getLayoutParams());
+
+        TextView note = new TextView(this);
+        note.setText(t("点一下恢复，长按立刻删除。满 7 天自动清理。", "Tap to restore, long-press to delete now. Auto-cleaned after 7 days."));
+        note.setTextColor(Color.parseColor(COL_STAT));
+        note.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(12));
+        note.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(-1, -2);
+        nlp.topMargin = dp(18);
+        listBox.addView(note, nlp);
+    }
+
+    private View trashRow(final File slot) {
+        LinearLayout wrap = new LinearLayout(this);
+        wrap.setOrientation(LinearLayout.HORIZONTAL);
+        wrap.setGravity(Gravity.CENTER_VERTICAL);
+        wrap.setMinimumHeight(dp(60));
+        wrap.setPadding(dp(16), dp(12), dp(16), dp(12));
+        wrap.setBackground(selector());
+
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+
+        TextView name = new TextView(this);
+        String full = io.github.xejohv.classic.Trash.nameOf(slot);
+        int dot = full.lastIndexOf('.');
+        name.setText(dot > 0 ? full.substring(0, dot) : full);
+        name.setTextColor(Color.parseColor(COL_NAME));
+        name.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(15));
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        col.addView(name);
+
+        TextView meta = new TextView(this);
+        int days = io.github.xejohv.classic.Trash.daysLeft(slot);
+        meta.setText(days <= 0 ? t("即将清理", "Cleaning up") : t("还剩 " + days + " 天", days + " days left"));
+        meta.setTextColor(Color.parseColor(COL_META));
+        meta.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(12));
+        meta.setPadding(0, dp(3), 0, 0);
+        col.addView(meta);
+
+        wrap.addView(col, new LinearLayout.LayoutParams(0, -2, 1));
+
+        TextView arrow = new TextView(this);
+        arrow.setText("\u21BA");
+        arrow.setTextColor(Color.parseColor(COL_ARROW));
+        arrow.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(17));
+        wrap.addView(arrow, new LinearLayout.LayoutParams(-2, -2));
+
+        wrap.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { confirmRestore(slot); }
+        });
+        wrap.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override public boolean onLongClick(View v) {
+                confirmDrop(slot);
+                return true;
+            }
+        });
+        return wrap;
+    }
+
+    private void confirmRestore(final File slot) {
+        podAlert(t("恢复这本书？", "Restore this book?"),
+                t("《" + io.github.xejohv.classic.Trash.nameOf(slot) + "》会放回书库。",
+                        "《" + io.github.xejohv.classic.Trash.nameOf(slot) + "》 will go back to the library."),
+                t("恢复", "Restore"), false,
+                new Runnable() {
+                    @Override public void run() {
+                        boolean ok = io.github.xejohv.classic.Trash.restore(slot);
+                        toast(ok ? t("已恢复到书库", "Restored to library") : t("恢复失败", "Restore failed"));
+                        reload();
+                    }
+                });
+    }
+
+    private void confirmDrop(final File slot) {
+        podAlert(t("立刻删除？", "Delete now?"),
+                t("《" + io.github.xejohv.classic.Trash.nameOf(slot) + "》将被彻底删除，无法恢复。",
+                        "《" + io.github.xejohv.classic.Trash.nameOf(slot) + "》 will be deleted permanently."),
+                t("删除", "Delete"), true,
+                new Runnable() {
+                    @Override public void run() {
+                        io.github.xejohv.classic.Trash.drop(slot);
+                        reload();
+                    }
+                });
+    }
+
+    /** 书库自己画的那几处文字跟系统语言走（英文界面里不再夹中文按钮） */
+    private static String t(String zh, String en) {
+        return java.util.Locale.getDefault().getLanguage().startsWith("en") ? en : zh;
+    }
+
+    private void toast(String s) {
+        android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * 应用自己的确认框：奶油色圆角卡片 + 一条发丝线 + 两枚文字按钮，
+     * 跟书库同一套纸色，不走系统 AlertDialog 那套黑框大字。
+     */
+    private void podAlert(String title, String message, String okLabel, boolean destructive, final Runnable onOk) {
+        final android.app.Dialog d = new android.app.Dialog(this);
+        d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+
+        TextView t = new TextView(this);
+        t.setText(title);
+        t.setTextColor(Color.parseColor(COL_NAME));
+        t.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(17));
+        t.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        t.setPadding(dp(22), dp(22), dp(22), 0);
+        root.addView(t, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView m = new TextView(this);
+        m.setText(message);
+        m.setTextColor(Color.parseColor(COL_META));
+        m.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(13));
+        m.setLineSpacing(dp(4), 1f);
+        m.setPadding(dp(22), dp(10), dp(22), dp(20));
+        root.addView(m, new LinearLayout.LayoutParams(-1, -2));
+
+        View line = new View(this);
+        line.setBackgroundColor(Color.parseColor(COL_SEP));
+        root.addView(line, new LinearLayout.LayoutParams(-1, dp(1)));
+
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+
+        TextView cancel = new TextView(this);
+        cancel.setText(t("取消", "Cancel"));
+        cancel.setTextColor(Color.parseColor(COL_META));
+        cancel.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(15));
+        cancel.setGravity(Gravity.CENTER);
+        cancel.setPadding(0, dp(14), 0, dp(14));
+        cancel.setBackground(selector());
+        cancel.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { d.dismiss(); }
+        });
+        bar.addView(cancel, new LinearLayout.LayoutParams(0, -2, 1));
+
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.parseColor(COL_SEP));
+        bar.addView(divider, new LinearLayout.LayoutParams(dp(1), -1));
+
+        TextView ok = new TextView(this);
+        ok.setText(okLabel);
+        ok.setTextColor(Color.parseColor(destructive ? "#B3261E" : "#7A5326"));
+        ok.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp(15));
+        ok.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        ok.setGravity(Gravity.CENTER);
+        ok.setPadding(0, dp(14), 0, dp(14));
+        ok.setBackground(selector());
+        ok.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                d.dismiss();
+                onOk.run();
+            }
+        });
+        bar.addView(ok, new LinearLayout.LayoutParams(0, -2, 1));
+        root.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+
+        android.graphics.drawable.GradientDrawable card = new android.graphics.drawable.GradientDrawable();
+        card.setColor(Color.parseColor(COL_CARD));
+        card.setCornerRadius(dp(14));
+        root.setBackground(card);
+        root.setClipToOutline(true);
+
+        d.setContentView(root);
+        android.view.Window w = d.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+            w.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            android.view.WindowManager.LayoutParams lp = w.getAttributes();
+            lp.dimAmount = 0.5f;
+            int screen = getResources().getDisplayMetrics().widthPixels;
+            lp.width = Math.min(dp(330), screen - dp(56));
+            lp.height = android.view.WindowManager.LayoutParams.WRAP_CONTENT;
+            w.setAttributes(lp);
+        }
+        d.show();
     }
 
     /** Page the reader left this book on; 0 when it was never opened. */

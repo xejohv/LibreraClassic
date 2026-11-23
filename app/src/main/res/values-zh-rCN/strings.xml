@@ -64,6 +64,8 @@
     <string name="vibrate">振动</string>
     <string name="sound">按键音</string>
     <string name="sound_and_vibrate">按键音和振动</string>
+    <string name="camera">相机</string>
+    <string name="bluetooth">蓝牙</string>
     <string name="theme">主题</string>
     <string name="theme_red">红色</string>
     <string name="theme_black">黑色</string>
@@ -121,6 +123,7 @@
     <string name="quality_mid">标准</string>
     <string name="quality_low">低</string>
     <string name="delete_record">删除录音</string>
+    <string name="trash_moved">已移到回收站，7 天后删除</string>
     <string name="delete">删除</string>
     <string name="mic_permission">需要麦克风权限，请在系统设置中允许本应用录音</string>
     <string name="record_empty">暂无录音</string>

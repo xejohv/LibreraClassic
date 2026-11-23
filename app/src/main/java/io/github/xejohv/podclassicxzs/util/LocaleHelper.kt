@@ -2,6 +2,8 @@ package io.github.xejohv.podclassicxzs.util
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import java.util.Locale
 
 /**
@@ -46,6 +48,30 @@ object LocaleHelper {
         LANG_TW -> Locale.TRADITIONAL_CHINESE
         LANG_EN -> Locale.US
         else -> null
+    }
+
+    /**
+     * AppCompat 的应用级语言（AndroidX 1.6 那套）。
+     *
+     * 光在 attachBaseContext 里 createConfigurationContext 是会被 AppCompat 的
+     * 代理再算一次的，所以真正的入口是 setApplicationLocales：它会把语言写进
+     * Activity 的 override configuration，运气好连系统自己弹的对话框一起换掉。
+     * 已经是要的语言就不动，避免每次启动都触发一次无意义的重建。
+     */
+    fun applyAppCompat(base: Context) {
+        val id = languageId(base)
+        val want = when (id) {
+            LANG_CN -> LocaleListCompat.forLanguageTags("zh-CN")
+            LANG_TW -> LocaleListCompat.forLanguageTags("zh-TW")
+            LANG_EN -> LocaleListCompat.forLanguageTags("en-US")
+            else -> LocaleListCompat.getEmptyLocaleList()
+        }
+        try {
+            if (AppCompatDelegate.getApplicationLocales().toString() != want.toString()) {
+                AppCompatDelegate.setApplicationLocales(want)
+            }
+        } catch (e: Exception) {
+        }
     }
 
     /** 给 Application / Activity 的 base context 套上目标语言 */

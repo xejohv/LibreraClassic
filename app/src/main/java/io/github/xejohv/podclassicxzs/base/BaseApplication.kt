@@ -57,6 +57,8 @@ class BaseApplication : Application() {
             return
         }
         context = this
+        // 冷启动也把上次选的语言交给 AppCompat，否则只有用户重新点一次设置才生效
+        io.github.xejohv.podclassicxzs.util.LocaleHelper.applyAppCompat(this)
         Core.init()
         MediaScanUtil.scanMissingAsync(this)
     }

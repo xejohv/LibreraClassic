@@ -102,7 +102,7 @@ class CameraView(context: Context) : FrameLayout(context), ScreenView {
 
     // ---------------- ScreenView ----------------
 
-    override fun getTitle(): String = "相机"
+    override fun getTitle(): String = io.github.xejohv.podclassicxzs.values.Strings.CAMERA
 
     override fun getLaunchMode(): Int = ScreenView.LAUNCH_MODE_SINGLE
 

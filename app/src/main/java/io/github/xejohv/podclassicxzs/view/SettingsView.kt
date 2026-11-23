@@ -905,8 +905,11 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                                                 SPManager.setInt(SPManager.Language.SP_NAME, index)
                                                 // 1. 先把偏好同步落盘（commit），否则紧接重建进程时这次写入会丢
                                                 SPManager.save()
-                                                // 2. 把语言落到 resources 上，Strings 立即按新语言重新取字符串
-                                                LocaleHelper.applyTo(io.github.xejohv.podclassicxzs.base.BaseApplication.context)
+                                                // 2. 走 AppCompat 的应用级语言（真正能作用到 Activity 资源的那一层），
+                                                //    再把语言落到应用上下文上，Strings 立刻按新语言重新取字符串
+                                                val app = io.github.xejohv.podclassicxzs.base.BaseApplication.context
+                                                LocaleHelper.applyAppCompat(app)
+                                                LocaleHelper.applyTo(app)
                                                 Strings.init()
                                                 // 3. 原地重建 Activity：attachBaseContext 会按新语言重新包装，
                                                 //    界面当场换成新语言，不用退出应用，也不闪系统桌面

@@ -64,6 +64,8 @@
     <string name="vibrate">振動</string>
     <string name="sound">按鍵音</string>
     <string name="sound_and_vibrate">按鍵音和振動</string>
+    <string name="camera">相機</string>
+    <string name="bluetooth">藍牙</string>
     <string name="theme">主題</string>
     <string name="theme_red">紅色</string>
     <string name="theme_black">黑色</string>
@@ -123,6 +125,7 @@
     <string name="quality_mid">標準</string>
     <string name="quality_low">低</string>
     <string name="delete_record">刪除錄音</string>
+    <string name="trash_moved">已移到資源回收筒，7 天後刪除</string>
     <string name="delete">刪除</string>
     <string name="mic_permission">需要麥克風權限，請在系統設定中允許本應用錄音</string>
     <string name="record_empty">尚無錄音</string>

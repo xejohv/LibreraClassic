@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.plugin.compose' version '2.0.0'
 }
@@ -10,13 +10,15 @@ android {
         applicationId "io.github.xejohv.libreraclassic"
         minSdk 26
         targetSdk 34
-        versionCode 23
-        versionName "1.19"
+        versionCode 25
+        versionName "1.21"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         // 只用这两种语言：资源表里其余 80 多种翻译全部丢弃
-        resourceConfigurations += ['zh-rCN', 'en']
+        // 语言要在设置里真能切换，这几个 qualifier 就必须原样留下：
+        // 'en' 只匹配 values-en，values-en-rUS 会被当成另一种语言筛掉（之前切英语无效就是这个）
+        resourceConfigurations += ['zh-rCN', 'zh-rTW', 'en-rUS', 'en']
         ndk { abiFilters 'arm64-v8a' }
     }
 

@@ -93,7 +93,7 @@ class AppsView(context: Context) : ItemListView(
     }, true)
 
     // 录音（语音备忘录）：iPod Classic 的基础能力，放在附加程序里
-    private val recordItem = Item("录音", object : OnItemClickListener {
+    private val recordItem = Item(Strings.RECORD, object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
             Core.addView(RecordView(context))
             return true
@@ -109,7 +109,7 @@ class AppsView(context: Context) : ItemListView(
     }, true)
 
     // 机身配色入口：四色严格按官方发布颜色命名
-    private val themeItem = Item("主题", object : OnItemClickListener {
+    private val themeItem = Item(Strings.THEME, object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
             Core.addView(ThemeView(context))
             return true
@@ -119,7 +119,7 @@ class AppsView(context: Context) : ItemListView(
     // 相机：直接拉起索尼原厂相机，界面、功能都用系统的；
     // 因为这台机器的导航栏被整体拿掉了，进外部 App 以后没有返回入口，
     // 所以同时盖一条自己的控制条（← 返回 / iPod），回本应用时由 onResume 收掉
-    private val cameraItem = Item("相机", object : OnItemClickListener {
+    private val cameraItem = Item(Strings.CAMERA, object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
             try {
                 val intent = android.content.Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
@@ -136,7 +136,7 @@ class AppsView(context: Context) : ItemListView(
     }, true)
 
     // 蓝牙设置入口（单实例，重复进页也不会重复添加）
-    private val btItem = Item("蓝牙", object : OnItemClickListener {
+    private val btItem = Item(Strings.BLUETOOTH, object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
             Core.addView(BluetoothView(context))
             return true
