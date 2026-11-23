@@ -4,7 +4,7 @@ An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)*
 
 面向 **索尼 Xperia XZs（SO-03J 日版）** 的 iPod Classic 风格本地音乐播放器，由 PodClassic 一系改造而来，按「纯音乐播放器」整机场景重新调过。
 
-**当前版本：v1.19（versionCode 23，安装包名 `io.github.xejohv.libreraclassic`）** — 安装包见 [dist/PodClassic-XZs-1.19.apk](./dist/PodClassic-XZs-1.19.apk)，[Releases](https://github.com/xejohv/LibreraClassic/releases) 同步放同一份，逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+**当前版本：v1.21（versionCode 25，安装包名 `io.github.xejohv.libreraclassic`）** — 安装包见 [dist/PodClassic-XZs-1.21.apk](./dist/PodClassic-XZs-1.21.apk)，[Releases](https://github.com/xejohv/LibreraClassic/releases) 同步放同一份，逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 ---
 
