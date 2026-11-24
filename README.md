@@ -4,8 +4,9 @@
 
 A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an iPod Classic-shaped device: local music player plus e-book reader, one package, one home screen, one click wheel.
 
-**当前版本 1.42 / versionCode 46 · 8.48 MB** · 包名 `io.github.xejohv.libreraclassic`
-安装包以 [Releases](https://github.com/xejohv/LibreraClassic/releases) 为准（`dist/` 只留早期历史包）；逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)，部署手册见 [docs/DEPLOY.md](./docs/DEPLOY.md)。
+**对外发布版本 1.41 / versionCode 45 · 8.48 MB** · 包名 `io.github.xejohv.libreraclassic`
+安装包见 [Releases](https://github.com/xejohv/LibreraClassic/releases) 与 [dist/PodClassic-XZs-1.41.apk](./dist/PodClassic-XZs-1.41.apk)（同一份）；逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)，部署手册见 [docs/DEPLOY.md](./docs/DEPLOY.md)。
+
 
 ---
 
@@ -34,7 +35,7 @@ A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an 
 ## 外观与系统
 
 - 金色机身配色 + 黑转盘 + 白色三角，满幅贴边；四套机身配色（暖银 / 暗黑 / 冰蓝 / 金桔）。
-- 顶部单行标题栏：时间、播放状态、电量；无障碍服务掉线时在标题右侧画一枚红色「!」，**点它直接跳到系统无障碍页**，服务正常时该位置点击无反应。
+- 顶部单行标题栏：时间、播放状态、电量；无障碍服务掉线时在标题右侧画一枚红色「!」提示状态。
 - 状态栏、导航栏在任何界面都不显示（含相机、视频、蓝牙、游戏），下拉通知栏被顶部拦截条挡住。
 - 本应用就是桌面（`CATEGORY_HOME`），冷启动只起主进程，约 1 秒；锁定竖屏。
 
@@ -99,7 +100,7 @@ A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an 
 - 顶部拦截下拉状态栏；系统电源菜单被替换成 PodClassic 风格；锁屏是自绘滑动解锁。
 - 插线自动选「传输文件」，MTP 授权弹窗自动点「允许」（只在文案同时匹配时动手）。
 - 进入系统设置、相机等没有导航栏的界面时，顶部覆盖一条悬浮返回条（`‹ 返回` / `iPod`）。
-- 每次覆盖安装后无障碍绑定会被系统清空，标题栏出现红色「!」，此时点它即可跳到无障碍页重新开启。
+- 每次覆盖安装后无障碍绑定会被系统清空，标题栏出现红色「!」，需重新到系统无障碍页开启服务。
 
 ## 数据目录
 
@@ -137,7 +138,7 @@ adb shell settings put secure accessibility_enabled 1
 | 分辨率 | 1080×1920，density 480（densityDpi 540） |
 | minSdk / targetSdk | 26 / 34 |
 | applicationId | `io.github.xejohv.libreraclassic` |
-| 版本 | 1.42（versionCode 46） |
+| 版本 | 1.41（versionCode 45） |
 
 ## 已知限制
 
@@ -159,7 +160,7 @@ A single-APK retrofit for a **Sony Xperia XZs (SO-03J)**: iTunes-era iPod Classi
 ## Look and system
 
 - Gold body palette with black click wheel; four body themes (Warm Silver / Black / Ice Blue / Citrus).
-- One-line title bar: time, playback state, battery. When the accessibility service drops, a red **!** is drawn next to the title — **tapping it opens the system accessibility settings**; while the service is connected the same spot does nothing.
+- One-line title bar: time, playback state, battery. When the accessibility service drops, a red ! is drawn next to the title as a status marker.
 - Status bar and navigation bar are hidden everywhere (camera, video, Bluetooth, games included); notification shade pulls are blocked by a top strip.
 - The app is the home screen itself (`CATEGORY_HOME`); cold start brings up only the main process (~1 s). Portrait locked.
 
@@ -224,7 +225,7 @@ Five groups:
 - Top strip blocks the notification shade; the system power menu is replaced by the PodClassic one; lock screen is a custom slide-to-unlock.
 - Plugging in USB auto-selects "Transfer files" and auto-accepts the MTP prompt (only when the exact labels match).
 - System settings and camera have no navigation bar, so a floating `‹ Back` / `iPod` bar is overlaid there.
-- Every reinstall clears the accessibility binding, which brings back the red **!** — tap it to reopen the accessibility page.
+- Every reinstall clears the accessibility binding, which brings back the red !; re-enable the service in system accessibility settings.
 
 ## Data folders
 
@@ -262,7 +263,7 @@ adb shell settings put secure accessibility_enabled 1
 | Screen | 1080×1920, density 480 (densityDpi 540) |
 | minSdk / targetSdk | 26 / 34 |
 | applicationId | `io.github.xejohv.libreraclassic` |
-| Version | 1.42 (versionCode 46) |
+| Version | 1.41 (versionCode 45) |
 
 ## Known limits
 
