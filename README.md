@@ -5,7 +5,7 @@
 A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an iPod Classic-shaped device: local music player plus e-book reader, one package, one home screen, one click wheel.
 
 **当前版本 1.42 / versionCode 46 · 8.48 MB** · 包名 `io.github.xejohv.libreraclassic`
-安装包见 [Releases](https://github.com/xejohv/LibreraClassic/releases)，逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)，部署手册见 [docs/DEPLOY.md](./docs/DEPLOY.md)。
+安装包以 [Releases](https://github.com/xejohv/LibreraClassic/releases) 为准（`dist/` 只留早期历史包）；逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)，部署手册见 [docs/DEPLOY.md](./docs/DEPLOY.md)。
 
 ---
 
