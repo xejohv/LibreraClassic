@@ -7,14 +7,15 @@ This file is the long form of the "Lineage & Copyright" section in [README.md](.
 
 | 目录 | 上游项目 / Upstream | 权利人 / Copyright holder | 许可 / License |
 | --- | --- | --- | --- |
-| `app/`（启动器、音乐、相册、视频、游戏、设置） | PodClassic 1.5（MIT）→ PodClassicMod → PodClassic-XZs | Copyright (c) 2021 **0x1317bf7**（PodClassic）；**Dora-z**（PodClassicMod）；**xejohv**（本分支） | MIT（全文：[LICENSE](./LICENSE)） |
-| `reader/`（阅读器，Java 包名 `com.foobnix.*`、`org.ebookdroid.*`） | **Librera Reader 10.1.14**，https://github.com/foobnix/LibreraReader | Copyright (C) **Ivan Ivanenko**（GitHub @foobnix）及上游贡献者 | GPL-3.0-or-later（全文：[LICENSES/GPL-3.0.txt](./LICENSES/GPL-3.0.txt)） |
+| `app/`（启动器、音乐、相册、视频、游戏、设置） | PodClassic 1.5（MIT）→ PodClassicMod → PodClassic-XZs | Copyright (c) 2021 **0x1317bf7**（PodClassic）；**Dora-z**（PodClassicMod）；**xejohv**（本分支） | MIT（全文：[LICENSE-MIT.txt](./LICENSE-MIT.txt)） |
+| `reader/`（阅读器，Java 包名 `com.foobnix.*`、`org.ebookdroid.*`） | **Librera Reader 10.1.14**，https://github.com/foobnix/LibreraReader | Copyright (C) **Ivan Ivanenko**（GitHub @foobnix）及上游贡献者 | GPL-3.0-or-later（全文：[LICENSE](./LICENSE)） |
 
 两块代码在同一个 APK 里运行（启动器主进程 + 阅读器 `:reader` 进程），属于**合并作品**，不是两个独立分发物。
 
 ## 2. 合并作品的许可结论 / License of the combined work
 
 - `reader/` 以 GPL-3.0-or-later 授权，具有传染性。因此**发布的 APK 整体、以及包含 `reader/` 的源码集合，均按 GPL-3.0-or-later 分发**；其中 `app/` 目录里 PodClassic 派生的代码同时保留 MIT 授权（MIT 与 GPLv3 兼容，可继续按 MIT 使用该部分）。
+- 文件层面的对应关系：仓库根 `LICENSE` = GPLv3 全文（整包与 `reader/` 适用），`LICENSE-MIT.txt` = MIT 全文（`app/` 中 PodClassic 派生代码适用），二者同时存在于仓库根，发布时不删任一份。
 - 再分发 APK 或修改版时必须遵守 GPLv3，至少包括：
   1. 保留全部版权声明与许可声明，附上 GPLv3 全文；
   2. 提供或指明「对应源码」（本仓库即为对应源码，含全部修改）；
