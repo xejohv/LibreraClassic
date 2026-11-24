@@ -17,6 +17,7 @@ import io.github.xejohv.podclassicxzs.util.LocaleHelper
 import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
 import io.github.xejohv.podclassicxzs.util.BrightnessUtil
 import io.github.xejohv.podclassicxzs.util.StorageUtil
+import io.github.xejohv.podclassicxzs.util.SysInfo
 import io.github.xejohv.podclassicxzs.values.Colors
 import io.github.xejohv.podclassicxzs.values.Strings
 import io.github.xejohv.podclassicxzs.values.Values
@@ -38,8 +39,9 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
     private class InfoListView(
         context: Context,
         list: ArrayList<RecyclerListView.Item>,
-        title: String
-    ) : ItemListView(context, list, title, null) {
+        title: String,
+        defaultListener: OnItemClickListener? = null
+    ) : ItemListView(context, list, title, defaultListener) {
         init {
             highlightEnabled = false
         }
@@ -59,6 +61,10 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
 
     override fun getTitle(): String {
         return Strings.SETTINGS
+    }
+
+    override fun onViewResume() {
+        post { refreshList() }
     }
 
     /**
@@ -938,29 +944,87 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                                 }
                                 return true
                             }
-                        }, if (GestureService.isConnected()) Strings.ENABLE else Strings.DISABLE),
+                        }, if (GestureService.isConnected()) Strings.ENABLE else Strings.DISABLE).apply {
+                            // 这个开关的状态只在系统设置里改得了。以前右值在创建设置页时算一次就定死了，
+                            // 从系统设置回来看到的还是旧值，得退出桌面再进才刷新。
+                            // 现在交给 liveRightText：每次重新绑定都现读一次服务连接状态。
+                            liveRightText = {
+                                if (GestureService.isConnected()) Strings.ENABLE else Strings.DISABLE
+                            }
+                        },
+                        Item(Strings.RESOURCE_MONITOR, object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                Core.addView(
+                                    InfoListView(context, arrayListOf(
+                                        Item(Strings.MEM_AVAILABLE, null, SysInfo.memAvailable()).apply {
+                                            liveRightText = { SysInfo.memAvailable() }
+                                        },
+                                        Item(Strings.MEM_TOTAL, null, SysInfo.memTotal()),
+                                        Item(Strings.MEM_USAGE, null, SysInfo.memUsage()).apply {
+                                            liveRightText = { SysInfo.memUsage() }
+                                        },
+                                        Item(Strings.APP_MEMORY, null, SysInfo.appMemory()).apply {
+                                            liveRightText = { SysInfo.appMemory() }
+                                        },
+                                        Item(Strings.CPU_LOAD, null, SysInfo.cpuLoad()).apply {
+                                            liveRightText = { SysInfo.cpuLoad() }
+                                        },
+                                        Item(Strings.PROCESS_COUNT, null, SysInfo.processCount()).apply {
+                                            liveRightText = { SysInfo.processCount() }
+                                        },
+                                        Item(Strings.BATTERY, null, SysInfo.batteryLevel()).apply {
+                                            liveRightText = { SysInfo.batteryLevel() }
+                                        },
+                                        Item(Strings.BATTERY_TEMP, null, SysInfo.batteryTemperature()).apply {
+                                            liveRightText = { SysInfo.batteryTemperature() }
+                                        }
+                                    ), Strings.RESOURCE_MONITOR, object : OnItemClickListener {
+                                        // 这页全是只读数值，没有可进入的条目：
+                                        // 中心键干脆当“重新读一遍”用，哪一行按下去都会重算
+                                        override fun onItemClick(
+                                            index: Int,
+                                            listView: RecyclerListView
+                                        ): Boolean {
+                                            listView.refreshList()
+                                            return true
+                                        }
+                                    })
+                                )
+                                return true
+                            }
+                        }, ""),
+                        Item(Strings.END_READER, object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                // 阅读器是独立进程，卡住或者不想让它在后台待着时，直接结束它
+                                Core.killReader()
+                                // 进程没了，右值“正在运行/未运行”要当场重算，不能等下次重建页面
+                                postDelayed({ listView.refreshList() }, 800L)
+                                return true
+                            }
+                        }, if (Core.isReaderRunning()) Strings.RUNNING else Strings.NOT_RUNNING).apply {
+                            liveRightText = {
+                                if (Core.isReaderRunning()) Strings.RUNNING else Strings.NOT_RUNNING
+                            }
+                        },
                         Item(Strings.RESET_ALL_SETTINGS, object : OnItemClickListener {
                             override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                // 确认页只留「恢复」一行：进到这一页就是要恢复，想反悔按 MENU 退回去。
+                                // 以前这里还摆一行「取消」，等于把一个返回键做成功能项，多余也误导。
                                 Core.addView(
                                     ItemListView(
                                         context, arrayListOf(
-                                            Item(Strings.CANCEL, object : OnItemClickListener {
-                                                override fun onItemClick(
-                                                    index: Int,
-                                                    listView: RecyclerListView
-                                                ): Boolean {
-                                                    Core.removeView(); return true
-                                                }
-                                            }, false),
                                             Item(Strings.RESET, object : OnItemClickListener {
                                                 override fun onItemClick(
                                                     index: Int,
                                                     listView: RecyclerListView
                                                 ): Boolean {
-                                                    Core.reset();Core.removeView(); return true
+                                                    // 落盘 + 阅读器纸色归位，然后重启进程，
+                                                    // 让主题、机身颜色、语言全部按默认重新加载
+                                                    Core.restoreAll(context)
+                                                    return true
                                                 }
-                                            }, false)
-                                        ), Strings.RESET_ALL, null
+                                            }, true)
+                                        ), Strings.RESET_ALL_SETTINGS, null
                                     )
                                 )
                                 return true

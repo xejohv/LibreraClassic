@@ -53,8 +53,18 @@ public final class PodReader {
     private static int TRACK = Color.parseColor("#48484A");
 
     /** 阅读纸色五套：白纸、米黄、护眼绿、夜间、深灰；前三套算白天，后两套算夜里。 */
-    static final int[] PAPER_BG = {0xFFFFFFFF, 0xFFF5EDDA, 0xFFE4EEE1, 0xFF000000, 0xFF1C1C1E};
-    static final int[] PAPER_TX = {0xFF1C1C1E, 0xFF3B3226, 0xFF24302A, 0xFFE6E6E6, 0xFFD8D8DC};
+    /**
+     * 五套纸色，按主流阅读器的惯例排（Kindle：白/棕褐/浅绿/黑；Apple Books：白/棕褐/夜间/灰；
+     * 微信读书：白/护眼绿/纸黄/黑），并保证相邻两套肉眼一眼分得出：
+     *  1 白纸      #FFFFFF  正文 #1C1C1E —— 干净底色，白天强光下最清楚
+     *  2 米黄纸    #F5EDDA  正文 #3B3226 —— sepia 棕褐系（业界常用 #F4ECD8），暖而不黄
+     *  3 护眼绿    #DCEAD8  正文 #26332A —— 比旧版更绿一档，免得和白纸糊在一起
+     *  4 夜间      #000000  正文 #E6E6E6 —— 纯黑，夜里最不刺眼（同 Kindle 黑、Apple Books 夜间）
+     *  5 深灰      #34343B  正文 #E8E8EE —— 石墨灰，和纯黑差 52 个色阶，一眼能分
+     * 旧版第五套是 #1C1C1E，与纯黑只差 28 个色阶，在手机屏上几乎看不出区别，等于白给一档。
+     */
+    static final int[] PAPER_BG = {0xFFFFFFFF, 0xFFF5EDDA, 0xFFDCEAD8, 0xFF000000, 0xFF34343B};
+    static final int[] PAPER_TX = {0xFF1C1C1E, 0xFF3B3226, 0xFF26332A, 0xFFE6E6E6, 0xFFE8E8EE};
     private static final int PAPER_DEFAULT = 3;
 
     /** Everything the reader draws around the page: title row, icon row, footer, shelf, counters. */
@@ -86,7 +96,7 @@ public final class PodReader {
     // 纸色是用户挑的，菜单配色跟着纸色走：挑浅色纸就是白天，挑深色纸就是夜里。
     // 以前这一屏写死黑底，白纸书里弹出一块黑板；现在页纸、页边、菜单都由同一个纸色开关决定。
     private static android.content.SharedPreferences podPrefs(Activity a) {
-        return a.getSharedPreferences("PodClassicReader", android.content.Context.MODE_PRIVATE);
+        return a.getSharedPreferences("PodClassicReader", android.content.Context.MODE_MULTI_PROCESS);
     }
 
     /** 纸色下标：0 白纸 1 米黄 2 护眼 3 夜间 4 深灰；前三套算白天。 */
@@ -182,7 +192,7 @@ public final class PodReader {
         // far too few characters per line on a 1080x1920 iPod panel. Seed a size that puts
         // about 22 characters on a line, once, and never fight the reader's own slider after.
         try {
-            android.content.SharedPreferences seed = a.getSharedPreferences("PodClassicReader", android.content.Context.MODE_PRIVATE);
+            android.content.SharedPreferences seed = a.getSharedPreferences("PodClassicReader", android.content.Context.MODE_MULTI_PROCESS);
             if (!seed.getBoolean("sizeFixV17", false)) {
                 // 一次到底的基线：正文按 11 起排（这台 5 寸屏上大约一行 16～17 个字），
                 // 之后只认菜单和右边缘手势，不再每次进来重排一次。
@@ -247,8 +257,10 @@ public final class PodReader {
             boolean layout = p.endsWith(".pdf") || p.endsWith(".djvu") || p.endsWith(".xps")
                     || p.endsWith(".cbz") || p.endsWith(".cbr") || p.endsWith(".zip")
                     || p.endsWith(".jpg") || p.endsWith(".jpeg") || p.endsWith(".png");
-            boolean day = a.getSharedPreferences("PodClassicReader", android.content.Context.MODE_PRIVATE)
+            boolean day = a.getSharedPreferences("PodClassicReader", android.content.Context.MODE_MULTI_PROCESS)
                     .getBoolean("dayMode", false);
+            // 页边、菜单、页码跟着纸色走：夜间/深灰纸就是一套深色 chrome。
+            // 版式书本身原色不改，引擎按白天启动最省事（不会给页面套反色）。
             DAY_SCHEME = layout || day;
             com.foobnix.model.AppState.get().isDayNotInvert = layout || day;
             paintBackdrop(a);
@@ -329,13 +341,16 @@ public final class PodReader {
             // 版式书不再另压一层底色：页边、页面画布、纸三者同色，
             // 屏幕上就只剩文档本身那一种颜色（以前这里压白，叠出三层色）
             if (p.endsWith(".pdf") || p.endsWith(".djvu") || p.endsWith(".xps")) {
-                // 页面画布与页边都纯白：PDF 里“白”是透明，画布一旦染色，整页就跟着变色
+                // 版式书一律原色：PDF 是一张成品纸，它的“白”就是纸本身。
+                // 试过把它按纸色重映射（夜间等价反色），实测观感很差，且公文、印章、扫描件都会被改色，
+                // 因此这里固定成白纸黑字，只有页边（背板）跟着纸色走——白页面放在有色桌面上。
                 AppState s = AppState.get();
                 s.colorDayBg = 0xFFFFFFFF;
+                s.colorDayText = 0xFF000000;
                 s.colorDayForeground = 0xFFFFFFFF;
                 s.colorNigthBg = 0xFFFFFFFF;
+                s.colorNigthText = 0xFF000000;
                 s.colorNigthForeground = 0xFFFFFFFF;
-                android.util.Log.d("PodReader", "pdf original colors " + String.format(java.util.Locale.ROOT, "%08X %08X", s.colorDayBg, s.colorNigthBg));
                 return;
             }
             // 漫画只有一张图：夜里纯黑、白天纯白，页边不再出现比图更浅的灰带
@@ -354,22 +369,9 @@ public final class PodReader {
 
     /** In daylight the page is white, so nothing behind it may stay black. */
     private static void paintBackdrop(Activity a) {
-        // 背板就是纸色；翻页时页边那道缝不再露出另一种颜色。
-        // 版式书例外：页面本身是原色白，背板必须同为白，否则白页镶一圈彩边
+        // 背板就是纸色；PDF 页面是原色白纸，这里不破例，
+        // 于是版式书看起来是“白纸放在彩色桌面上”，边缘不再出现第三种颜色。
         int bg = PAPER_BG[paper(a)];
-        try {
-            String path = com.foobnix.model.AppSP.get().lastBookPath;
-            if (path == null && a.getIntent() != null && a.getIntent().getData() != null) {
-                path = a.getIntent().getData().getPath();
-            }
-            if (path != null) {
-                String q = path.toLowerCase(java.util.Locale.ROOT);
-                if (q.endsWith(".pdf") || q.endsWith(".djvu") || q.endsWith(".xps")) {
-                    bg = 0xFFFFFFFF;
-                }
-            }
-        } catch (Throwable ignored) {
-        }
         View root = a.getWindow().getDecorView();
         if (root == null) {
             return;
@@ -2003,7 +2005,7 @@ public final class PodReader {
 
     private static void setDay(Activity a, DocumentController dc, boolean day) {
         // 记住用户选的外观：PDF/漫画这类版式书按原色显示，回到文本时才用它。
-        a.getSharedPreferences("PodClassicReader", android.content.Context.MODE_PRIVATE)
+        a.getSharedPreferences("PodClassicReader", android.content.Context.MODE_MULTI_PROCESS)
                 .edit().putBoolean("dayMode", day).apply();
         AppState s = AppState.get();
         s.isDayNotInvert = day;

@@ -4,7 +4,7 @@ An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)*
 
 面向 **索尼 Xperia XZs（SO-03J 日版）** 的 iPod Classic 风格本地音乐播放器，由 PodClassic 一系改造而来，按「纯音乐播放器」整机场景重新调过。
 
-**当前版本：v1.28（versionCode 32，安装包名 `io.github.xejohv.libreraclassic`）** — 安装包见 [dist/PodClassic-XZs-1.28.apk](./dist/PodClassic-XZs-1.28.apk)，[Releases](https://github.com/xejohv/LibreraClassic/releases) 同步放同一份，逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+**当前版本：v1.34（versionCode 38，安装包名 `io.github.xejohv.libreraclassic`）** — 安装包见 [dist/PodClassic-XZs-1.34.apk](./dist/PodClassic-XZs-1.34.apk)，[Releases](https://github.com/xejohv/LibreraClassic/releases) 同步放同一份，逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 ---
 
@@ -70,11 +70,15 @@ An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)*
 | 音效 | 均衡器、系统AGC、TomSteady、胆机音效、DC相位线性器，首行为「音效说明」长文 |
 | 录音 | 录音质量 |
 | 外观与操作 | 夜间模式、机身配色、按键反馈 |
-| 系统 | 关于本机、语言、辅助功能、重置 |
+| 系统 | 关于本机、语言、辅助功能、资源监视器、结束阅读进程、恢复所有设置 |
 
 - **关于本机**为只读信息页，只留「标签 + 数值」：音乐 / 视频 / 照片 / 容量 / 可用容量 / 版本 / S/N；容量明细（内部存储、SD 卡）收进「容量」二级页。版本行连点 6 次进入系统设置。
 - **容量口径**：内部存储 + SD 卡合计，精确到一位小数。
 - **语言**：自动 / 简体中文 / 繁体中文 / English，切换即时生效（原地重建界面）。
+- **辅助功能**行显示的是实时状态：从系统设置里开关回来，这一行立刻跟着变，不用退桌面再进。
+- **资源监视器**是只读信息页，固定八行（可用内存 / 内存总量 / 内存占用 / 本应用内存 / 本应用 CPU / 应用进程 / 电池 / 电池温度），数值现读现算；容量不在这里，去「关于本机」。按控制盘中心键＝重新读一遍。
+- **结束阅读进程**：单独一项，右侧显示 `:reader` 在跑还是在歇；点一下当场结束，不并进「恢复所有设置」。
+- **恢复所有设置**只留「恢复」一行：重置转盘偏好 → 阅读器纸色回夜间 → 清曲库索引缓存 → 偏好重新落盘 → 语言按默认重套 → 重启进程，五套纸色、机身配色、语言当场回到出厂。
 
 ### 附加程序
 - 相机入口、内嵌 PodClassic 风格蓝牙页（不跳系统设置）

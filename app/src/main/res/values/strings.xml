@@ -137,4 +137,18 @@
     <string name="group_system">系统</string>
     <string name="sound_help">音效说明</string>
     <string name="sound_help_text">系统 AGC（自动增益）：声音小的时候自动抬上来，环境吵的时候压下去，小声的录音听着更清楚。\n\nTomSteady（音量稳态）：把整首歌的音量锁在同一水平，忽大忽小的录音也会听着平稳，不会一会儿响一会儿轻。\n\n胆机音效：模拟电子管功放，给声音加一点温暖的中频和轻微失真，人声更厚。\n\nDC 相位线性器：按低、中、高分频点给各路声音加不同延迟，让低频与中高频重新对齐，鼓点和人声不会各走各的。\n\n均衡器：预先调好的音色（摇滚、流行、古典等），整体改变声音风格。\n\n这些都会实时处理音频，开着会多耗一点电；听不出差别就保持关闭。</string>
-    </resources>
+        <string name="end_reader">End Reader Process</string>
+    <string name="running">Running</string>
+    <string name="not_running">Not Running</string>
+    <string name="resource_monitor">Resource Monitor</string>
+    <string name="mem_available">Available Memory</string>
+    <string name="mem_total">Total Memory</string>
+    <string name="mem_usage">Memory Used</string>
+    <string name="app_memory">App Memory</string>
+    <string name="cpu_load">App CPU</string>
+    <string name="process_count">App Processes</string>
+    <string name="battery">Battery</string>
+    <string name="storage">Storage</string>
+    <string name="battery_temp">Battery Temp</string>
+    <string name="refresh">Refresh</string>
+</resources>

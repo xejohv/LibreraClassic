@@ -211,6 +211,14 @@ object Core {
         screen.add(view)
     }
 
+    /** 回到应用时，让当前页重新读一遍外部状态（详见 ScreenView.onViewResume） */
+    fun notifyResume() {
+        try {
+            screen.get().onViewResume()
+        } catch (t: Throwable) {
+        }
+    }
+
     fun getView(): ScreenView {
         return screen.get()
     }
@@ -340,12 +348,101 @@ object Core {
         }
     }
 
-    fun reset() {
+    /**
+     * 恢复所有设置：偏好 + 阅读器外观 + 缓存，最后重启进程。
+     * 只有进程重来，Colors 里那几个静态的主题/机身颜色才会按默认重算，
+     * 否则界面上看不出任何变化（这正是以前“点了恢复但什么都没变”的原因）。
+     */
+    fun restoreAll(context: android.content.Context) {
+        // 1. 播放器这一侧的偏好：主题、机身颜色、语言、显示、音效、播放、录音……
         SPManager.reset()
+        // 2. 阅读器在 :reader 进程里另存一套偏好，纸色和日夜模式也算“设置”
+        try {
+            context.getSharedPreferences("PodClassicReader", android.content.Context.MODE_MULTI_PROCESS)
+                .edit()
+                .putInt("paper", 3)            // 3 = 夜间，与 PodReader.PAPER_DEFAULT 一致
+                .putBoolean("dayMode", false)
+                .commit()
+        } catch (t: Throwable) {
+            // 从没进过阅读器就没有这个文件，忽略
+        }
+        // 3. 曲库索引缓存一并清掉，恢复后按默认重新扫
         MusicListTable.album.clear()
         MusicListTable.folder.clear()
         MusicListTable.artist.clear()
         MusicTable.favourite.clear()
+        // 4. 偏好先同步落盘，否则紧接着重启进程会把这次写入丢掉
+        SPManager.save()
+        // 5. 语言按默认重新套到资源层，Strings 立刻按新语言取字符串
+        val app = BaseApplication.context
+        LocaleHelper.applyAppCompat(app)
+        LocaleHelper.applyTo(app)
+        Strings.init()
+        // 6. 重启（恢复设置本来就等于重启一次）
+        reboot()
+    }
+
+    /**
+     * 阅读器跑在独立的 :reader 进程里，给它一个能单独结束的入口。
+     * 同一个 uid，找到 pid 直接 killProcess 就行，不用额外权限。
+     */
+    fun readerPid(): Int {
+        val pkg = BaseApplication.context.packageName
+        val target = pkg + ":reader"
+        // 先扫 /proc：进程一死目录就没了，判断比系统的进程表更及时
+        try {
+            val dirs = java.io.File("/proc").listFiles()
+            if (dirs != null) {
+                for (f in dirs) {
+                    val name = f.name
+                    if (name.isEmpty() || !name[0].isDigit()) continue
+                    try {
+                        val cmd = java.io.File(f, "cmdline").readText()
+                                .substringBefore('\u0000').trim()
+                        if (cmd == target) return name.toInt()
+                    } catch (t: Throwable) {
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+        }
+        // 兜底再问系统进程表
+        try {
+            val am = BaseApplication.context.getSystemService(android.content.Context.ACTIVITY_SERVICE)
+                    as android.app.ActivityManager
+            val list = am.runningAppProcesses
+            if (list != null) {
+                for (info in list) {
+                    if (info.processName == target) return info.pid
+                }
+            }
+        } catch (t: Throwable) {
+        }
+        return -1
+    }
+
+    /** 刚结束过阅读器的时间点；系统的进程表有滞后，这段时间内直接按“没在运行”算 */
+    private var readerKilledAt = 0L
+
+    fun isReaderRunning(): Boolean {
+        if (readerKilledAt > 0L &&
+            android.os.SystemClock.elapsedRealtime() - readerKilledAt < 5000L
+        ) {
+            return false
+        }
+        return readerPid() > 0
+    }
+
+    fun killReader(): Boolean {
+        val pid = readerPid()
+        if (pid <= 0) return false
+        return try {
+            android.os.Process.killProcess(pid)
+            readerKilledAt = android.os.SystemClock.elapsedRealtime()
+            true
+        } catch (t: Throwable) {
+            false
+        }
     }
 
     fun initUI() {

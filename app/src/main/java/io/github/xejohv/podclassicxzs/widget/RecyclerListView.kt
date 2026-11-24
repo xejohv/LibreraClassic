@@ -618,6 +618,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         var enable: Boolean = false
         var rightText = ""
 
+        /** 右侧文字的动态来源：非空时每次绑定都重新求值（用于系统状态类设置项） */
+        var liveRightText: (() -> String)? = null
+
         var extra: Any? = null
 
         constructor(name: String, onItemClickListener: OnItemClickListener?, enable: Boolean) {
@@ -659,7 +662,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 val item = itemList[actualIndex]
                 // 判断是否显示滚动条（item 数量大于 MAX_SIZE 时显示）
                 val showScrollBar = scrollBarVisible
-                holder.bind(item, highlightEnabled && actualIndex == index, item.enable, item.rightText, showScrollBar)
+                // 右侧文字允许“每次绑定时现取”：系统状态类的行不会因为页面缓存而显示旧值
+                val right = item.liveRightText?.invoke() ?: item.rightText
+                holder.bind(item, highlightEnabled && actualIndex == index, item.enable, right, showScrollBar)
                 // 设置 item 的点击监听
                 onItemCreated(actualIndex, holder.itemView as ItemView)
             }

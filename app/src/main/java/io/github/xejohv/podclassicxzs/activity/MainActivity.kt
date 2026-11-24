@@ -117,6 +117,8 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // 从系统设置回来（或任何原因回到 iPod 界面）时，把盖在外面的悬浮控制器收掉
         GestureService.hideExitBar()
+        // 同时让当前页重新读一遍系统状态（例如辅助功能开关的显示）
+        Core.notifyResume()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -424,8 +426,16 @@ class MainActivity : AppCompatActivity() {
             if (taskId > 0) {
                 try {
                     val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-                    am.moveTaskToFront(taskId, 0)
-                    return
+                    // 任务被系统回收后 moveTaskToFront 静默失败，先确认任务还活着
+                    val alive = try {
+                        am.getRunningTasks(20).any { it.id == taskId }
+                    } catch (t: Throwable) {
+                        true
+                    }
+                    if (alive) {
+                        am.moveTaskToFront(taskId, 0)
+                        return
+                    }
                 } catch (t: Throwable) {
                 }
             }

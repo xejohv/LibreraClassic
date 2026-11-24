@@ -136,4 +136,18 @@
     <string name="group_system">System</string>
     <string name="sound_help">About Sound</string>
     <string name="sound_help_text">System AGC: automatic gain — lifts quiet passages and tames loud ones, so quiet recordings are easier to hear.\n\nTomSteady: keeps overall volume steady across a track, so uneven recordings no longer jump between loud and soft.\n\nTube amp: emulates a valve amplifier, adding warm mids and slight distortion for a fuller vocal.\n\nDC phase linearizer: delays low / mid / high bands differently so bass and midrange line up again.\n\nEqualizer: preset tone shapes (rock, pop, classical...).\n\nAll of these process audio in real time and cost a little battery; leave them off if you cannot hear a difference.</string>
-    </resources>
+        <string name="end_reader">End Reader Process</string>
+    <string name="running">Running</string>
+    <string name="not_running">Not Running</string>
+    <string name="resource_monitor">Resource Monitor</string>
+    <string name="mem_available">Available Memory</string>
+    <string name="mem_total">Total Memory</string>
+    <string name="mem_usage">Memory Used</string>
+    <string name="app_memory">App Memory</string>
+    <string name="cpu_load">App CPU</string>
+    <string name="process_count">App Processes</string>
+    <string name="battery">Battery</string>
+    <string name="storage">Storage</string>
+    <string name="battery_temp">Battery Temp</string>
+    <string name="refresh">Refresh</string>
+</resources>

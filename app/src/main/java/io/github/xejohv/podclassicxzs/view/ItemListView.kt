@@ -43,4 +43,10 @@ open class ItemListView(
     override fun getTitle(): String {
         return title
     }
+
+    override fun onViewResume() {
+        // 重绑一次：Item.liveRightText 会在这时重新取系统状态，
+        // 于是“从系统设置里改完回来”看到的就是新值，不用退出桌面再进。
+        post { refreshList() }
+    }
 }

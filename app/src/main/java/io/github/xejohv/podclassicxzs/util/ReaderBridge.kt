@@ -48,8 +48,17 @@ object ReaderBridge {
             if (taskId > 0) {
                 try {
                     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-                    am.moveTaskToFront(taskId, 0)
-                    return true
+                    // 任务被系统回收后 moveTaskToFront 不抛异常、只是静默失败，
+                    // 旧代码当成成功直接 return，于是“点阅读没反应”。先确认任务还活着。
+                    val alive = try {
+                        am.getRunningTasks(20).any { it.id == taskId }
+                    } catch (t: Throwable) {
+                        true
+                    }
+                    if (alive) {
+                        am.moveTaskToFront(taskId, 0)
+                        return true
+                    }
                 } catch (t: Throwable) {
                 }
             }
