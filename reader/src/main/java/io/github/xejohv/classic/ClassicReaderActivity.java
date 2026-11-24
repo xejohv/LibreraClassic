@@ -67,15 +67,40 @@ public class ClassicReaderActivity extends Activity {
         if (keyCode == android.view.KeyEvent.KEYCODE_CAMERA || keyCode == android.view.KeyEvent.KEYCODE_FOCUS) {
             if (event.getRepeatCount() == 0) {
                 if (keyCode == android.view.KeyEvent.KEYCODE_CAMERA) {
+                    podFocusSawCamera = true;
+                    podKeyHandler.removeCallbacks(podFocusFallback);
+                    podKeyHandler.removeCallbacks(podFocusCommit);
+                    android.util.Log.d("PodKey", "lib CAMERA down");
                     // 从书库离开 = 阅读后台清零
                     libraryToMusic();
                 } else {
-                    toggleMusic();
+                    podFocusSawCamera = false;
+                    podFocusToggled = false;
+                    podKeyHandler.removeCallbacks(podFocusFallback);
+                    podKeyHandler.postDelayed(podFocusFallback, 1200);
+                    android.util.Log.d("PodKey", "lib FOCUS down");
                 }
             }
             return true;
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, android.view.KeyEvent event) {
+        if (keyCode == android.view.KeyEvent.KEYCODE_FOCUS || keyCode == android.view.KeyEvent.KEYCODE_CAMERA) {
+            if (keyCode == android.view.KeyEvent.KEYCODE_FOCUS) {
+                podKeyHandler.removeCallbacks(podFocusFallback);
+                boolean cameraSeen = podFocusSawCamera;
+                podFocusSawCamera = false;
+                android.util.Log.d("PodKey", "lib FOCUS up cameraSeen=" + cameraSeen);
+                if (!cameraSeen && !podFocusToggled) {
+                    podKeyHandler.postDelayed(podFocusCommit, 180);
+                }
+            }
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
     @Override
@@ -692,6 +717,32 @@ public class ClassicReaderActivity extends Activity {
      * 退出阅读：阅读器自己收尾，再把桌面（音乐主界面）唤到前台。
      * 合并后没有悬浮返回条，菜单键/书库左上的返回就是唯一出口。
      */
+    // —— 实体快门：半按 / 全按的区分 ——
+    // 真机上全按会先发 FOCUS(DOWN) 再发 CAMERA。若在 FOCUS 按下时就切歌，全按会顺带把播放切一次。
+    // 因此半按改成「抬起后确认」：FOCUS 抬起且期间没出现 CAMERA 才切歌；出现 CAMERA 就是全按。
+    // 兜底 1.2s：个别固件只发 FOCUS 按下不发抬起时，按住不放也能切。
+    private boolean podFocusSawCamera;
+    private boolean podFocusToggled;
+    private final android.os.Handler podKeyHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable podFocusCommit = new Runnable() {
+        @Override public void run() {
+            if (!podFocusSawCamera && !podFocusToggled) {
+                podFocusToggled = true;
+                android.util.Log.d("PodKey", "focus commit");
+                toggleMusic();
+            }
+        }
+    };
+    private final Runnable podFocusFallback = new Runnable() {
+        @Override public void run() {
+            if (!podFocusSawCamera && !podFocusToggled) {
+                podFocusToggled = true;
+                android.util.Log.d("PodKey", "focus fallback (no up event)");
+                toggleMusic();
+            }
+        }
+    };
+
     /** 半按快门：切一下播放/暂停（阅读器进程直接向启动器的播放服务发指令）。 */
     private void toggleMusic() {
         try {

@@ -1,3 +1,13 @@
+## v1.28 (vc32) — 2026-11-24 08:45
+
+- **修「全按会顺带切一次播放」**：真机上全按发出的是一串 `FOCUS(DOWN) → FOCUS(UP) → CAMERA(DOWN)`，此前半按在 `FOCUS(DOWN)` 就切歌，于是全按等于先切播放再切界面。现在半按改成**抬起后确认**：`FOCUS(UP)` 之后再看 180ms 内有没有 `CAMERA`，有就判定为全按、不切歌；`CAMERA(DOWN)` 也会立刻取消待定的切歌。兜底 1.2s 应对只发按下不发抬起的固件。
+- 三处（音乐 `MainActivity`、书页 `HorizontalViewActivity`、书库 `ClassicReaderActivity`）统一逻辑，并加 `PodKey` 日志便于实机核对按键时序。
+- 真机验证（SO-03J，1.28）：
+  - 单发 `FOCUS`：日志 `FOCUS down → FOCUS up → focus commit`，播放切一次，界面不动。
+  - `FOCUS` + `CAMERA` 连发（间隔 16 ms，模拟全按）：日志 `FOCUS down → FOCUS up → CAMERA down`，**没有 commit**，播放状态不变，只切界面；音乐→书库、书库→音乐、书页→音乐三种都通过。
+  - 书页第 2/748 页往返后仍停在原页。
+- 版本：versionCode 32 / versionName 1.28。
+
 ## v1.27 (vc31) — 2026-11-24 08:20
 
 - 桌面「阅读」入口与快门全按对齐：书页还在后台时点「阅读」直接 `moveTaskToFront` 把阅读任务提回前台，页码原样保留；只有没有书页时才打开书库（`ReaderBridge.resumeOrOpen`）。此前点「阅读」会打开书库，而书库 `onResume` 又把 `haveBook` 置假，等于顺手清掉了后台页。

@@ -4,7 +4,7 @@ An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)*
 
 面向 **索尼 Xperia XZs（SO-03J 日版）** 的 iPod Classic 风格本地音乐播放器，由 PodClassic 一系改造而来，按「纯音乐播放器」整机场景重新调过。
 
-**当前版本：v1.27（versionCode 31，安装包名 `io.github.xejohv.libreraclassic`）** — 安装包见 [dist/PodClassic-XZs-1.27.apk](./dist/PodClassic-XZs-1.27.apk)，[Releases](https://github.com/xejohv/LibreraClassic/releases) 同步放同一份，逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+**当前版本：v1.28（versionCode 32，安装包名 `io.github.xejohv.libreraclassic`）** — 安装包见 [dist/PodClassic-XZs-1.28.apk](./dist/PodClassic-XZs-1.28.apk)，[Releases](https://github.com/xejohv/LibreraClassic/releases) 同步放同一份，逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 ---
 
@@ -43,7 +43,8 @@ An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)*
 ### 阅读（内建）
 - **阅读器和播放器在同一个安装包里**，不存在第二个 App：一个包名、一个图标、一次安装，「附加程序 → 阅读」直接进阅读，不用再装阅读器。
 - **电子书放 `Download` 根目录，书库顶栏点「导入」**：Android 8 的 MTP 会把自建目录画成一张空白纸，所以书统一丢进系统 `Download`（电脑上永远是正常文件夹），书库右上角显示「导入 N」，确认后自动搬进 `Download\/Books`。
-- **实体快门键当切换键**：音乐界面全按 = 回到上次的阅读位置（书页与页码原样），书页/书库全按 = 回音乐且书页留在后台；只有从书库退出才清空阅读后台。**三个界面半按都是播放 / 暂停**。
+- **实体快门键当切换键**：音乐界面全按 = 回到上次的阅读位置（书页与页码原样），书页/书库全按 = 回音乐且书页留在后台；只有从书库退出才清空阅读后台。
+- **半按 / 全按严格区分**：全按在固件上会先发 `FOCUS(DOWN)` 再发 `CAMERA`，所以半按（播放 / 暂停）改为 `FOCUS` 抬起后确认、并留 180ms 观察窗，一旦见到 `CAMERA` 就按全按处理，不再顺带切歌。音乐 / 书页 / 书库三处一致。
 - **书库打开即落在「最近」**：按最后打开时间倒序，卡片带阅读进度；「全部 / 回收站」仍可点。桌面「阅读」入口与快门同逻辑——有书页在后台就直接提回原书原页，没有才开书库。
 - **桌面不会被阅读拖慢**：阅读器全部组件跑在独立进程 `:reader`，桌面/音乐进程里没有任何一个阅读器类；只有真的点了「阅读」才创建这个进程。冷启动只起主进程，实测约 1.0 s。
 - **阅读界面按 iPod 重做**：黑底、系统字体、单行标题（`‹ 书库` + 书名 + 页码）、底部细进度条、菜单是纯列表。合并后不再需要阅读页的悬浮返回条——「‹ 书库」回书库、「‹ 音乐」回桌面，书页里按返回键逐级往回。

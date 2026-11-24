@@ -2567,6 +2567,20 @@ public class HorizontalViewActivity extends AdsFragmentActivity {
 
     @Override
     public boolean onKeyUp(final int keyCode, final KeyEvent event) {
+        // 快门抬起：这一步才是「半按」的真正生效点
+        if (keyCode == KeyEvent.KEYCODE_FOCUS || keyCode == KeyEvent.KEYCODE_CAMERA) {
+            if (keyCode == KeyEvent.KEYCODE_FOCUS) {
+                podKeyHandler.removeCallbacks(podFocusFallback);
+                boolean cameraSeen = podFocusSawCamera;
+                podFocusSawCamera = false;
+                android.util.Log.d("PodKey", "book FOCUS up cameraSeen=" + cameraSeen);
+                if (!cameraSeen && !podFocusToggled) {
+                    // 不是立刻切：再等 180ms，防固件「先发抬起、紧接着发全按」
+                    podKeyHandler.postDelayed(podFocusCommit, 180);
+                }
+            }
+            return true;
+        }
         if (anchor == null) {
             return false;
         }
@@ -2637,6 +2651,32 @@ public class HorizontalViewActivity extends AdsFragmentActivity {
         return super.onKeyUp(keyCode, event);
     }
 
+    // —— 实体快门：半按 / 全按的区分 ——
+    // 真机上全按会先发 FOCUS(DOWN) 再发 CAMERA。若在 FOCUS 按下时就切歌，全按会顺带把播放切一次。
+    // 因此半按改成「抬起后确认」：FOCUS 抬起且期间没出现 CAMERA 才切歌；出现 CAMERA 就是全按。
+    // 兜底 1.2s：个别固件只发 FOCUS 按下不发抬起时，按住不放也能切。
+    private boolean podFocusSawCamera;
+    private boolean podFocusToggled;
+    private final android.os.Handler podKeyHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable podFocusCommit = new Runnable() {
+        @Override public void run() {
+            if (!podFocusSawCamera && !podFocusToggled) {
+                podFocusToggled = true;
+                android.util.Log.d("PodKey", "focus commit");
+                podToggleMusic();
+            }
+        }
+    };
+    private final Runnable podFocusFallback = new Runnable() {
+        @Override public void run() {
+            if (!podFocusSawCamera && !podFocusToggled) {
+                podFocusToggled = true;
+                android.util.Log.d("PodKey", "focus fallback (no up event)");
+                podToggleMusic();
+            }
+        }
+    };
+
     /** 半按快门：让启动器进程里的播放服务切一下播放/暂停（两进程同一安装包，startService 直达）。 */
     private void podToggleMusic() {
         try {
@@ -2693,13 +2733,21 @@ public class HorizontalViewActivity extends AdsFragmentActivity {
 
         LOG.d("onKeyDown", keyCode, event);
 
-        // 实体快门：半按 = 播放/暂停音乐，全按 = 回音乐界面（相机页的快门不受影响）
+        // 实体快门：全按 = 回音乐界面；半按判定推迟到抬起（见 onKeyUp）
         if (keyCode == KeyEvent.KEYCODE_CAMERA || keyCode == KeyEvent.KEYCODE_FOCUS) {
             if (event.getRepeatCount() == 0) {
                 if (keyCode == KeyEvent.KEYCODE_CAMERA) {
+                    podFocusSawCamera = true;
+                    podKeyHandler.removeCallbacks(podFocusFallback);
+                    podKeyHandler.removeCallbacks(podFocusCommit);
+                    android.util.Log.d("PodKey", "book CAMERA down");
                     podBackToMusic();
                 } else {
-                    podToggleMusic();
+                    podFocusSawCamera = false;
+                    podFocusToggled = false;
+                    podKeyHandler.removeCallbacks(podFocusFallback);
+                    podKeyHandler.postDelayed(podFocusFallback, 1200);
+                    android.util.Log.d("PodKey", "book FOCUS down");
                 }
             }
             return true;

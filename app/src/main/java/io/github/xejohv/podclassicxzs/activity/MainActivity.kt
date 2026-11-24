@@ -338,15 +338,33 @@ class MainActivity : AppCompatActivity() {
         if (event != null) {
             val code = event.keyCode
             if (code == KeyEvent.KEYCODE_CAMERA || code == KeyEvent.KEYCODE_FOCUS) {
-                // 半按（FOCUS）= 播放/暂停音乐；其余半按事件（抬起、长按重复）一律吞掉，
-                // 不能漏给系统，否则会拉起系统相机
+                // 半按（FOCUS）= 播放/暂停，但判定要等抬起：真机全按是先 FOCUS(DOWN) 再 CAMERA，
+                // 若按下就切歌，全按会顺带把播放切一次。FOCUS 抬起且期间没出现 CAMERA 才算半按。
+                // 其余半按事件（长按重复）一律吞掉，不能漏给系统，否则会拉起系统相机。
                 if (code == KeyEvent.KEYCODE_FOCUS) {
                     if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                        togglePlayPause()
+                        podFocusSawCamera = false
+                        podFocusToggled = false
+                        podKeyHandler.removeCallbacks(podFocusFallback)
+                        podKeyHandler.postDelayed(podFocusFallback, 1200L)
+                        android.util.Log.d("PodKey", "music FOCUS down")
+                    } else if (event.action == KeyEvent.ACTION_UP) {
+                        podKeyHandler.removeCallbacks(podFocusFallback)
+                        val cameraSeen = podFocusSawCamera
+                        podFocusSawCamera = false
+                        android.util.Log.d("PodKey", "music FOCUS up cameraSeen=$cameraSeen")
+                        if (!cameraSeen && !podFocusToggled) {
+                            // 再等 180ms，防固件「先发抬起、紧接着发全按」
+                            podKeyHandler.postDelayed(podFocusCommit, 180L)
+                        }
                     }
                     return true
                 }
                 if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 && !Core.lock) {
+                    podFocusSawCamera = true
+                    podKeyHandler.removeCallbacks(podFocusFallback)
+                    podKeyHandler.removeCallbacks(podFocusCommit)
+                    android.util.Log.d("PodKey", "music CAMERA down")
                     val view = Core.getView()
                     if (view is io.github.xejohv.podclassicxzs.view.CameraView) {
                         view.shutter()
@@ -358,6 +376,28 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    // —— 实体快门：半按 / 全按的区分 ——
+    // 全按在真机上是 FOCUS(DOWN) 紧跟 CAMERA；半按只发 FOCUS。所以半按要等 FOCUS 抬起再确认，
+    // 期间只要见过 CAMERA 就判定为全按，不再切歌。兜底 1.2s 防个别固件不发抬起。
+    private var podFocusSawCamera = false
+    private var podFocusToggled = false
+    private val podKeyHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val podFocusCommit = Runnable {
+        if (!podFocusSawCamera && !podFocusToggled) {
+            podFocusToggled = true
+            android.util.Log.d("PodKey", "focus commit")
+            togglePlayPause()
+        }
+    }
+
+    private val podFocusFallback = Runnable {
+        if (!podFocusSawCamera && !podFocusToggled) {
+            podFocusToggled = true
+            android.util.Log.d("PodKey", "focus fallback (no up event)")
+            togglePlayPause()
+        }
     }
 
     /**
