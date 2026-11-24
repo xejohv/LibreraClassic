@@ -1,3 +1,34 @@
+## v1.27 (vc31) — 2026-11-24 08:20
+
+- 桌面「阅读」入口与快门全按对齐：书页还在后台时点「阅读」直接 `moveTaskToFront` 把阅读任务提回前台，页码原样保留；只有没有书页时才打开书库（`ReaderBridge.resumeOrOpen`）。此前点「阅读」会打开书库，而书库 `onResume` 又把 `haveBook` 置假，等于顺手清掉了后台页。
+- 书库打开即落在「最近」页签（`mode = 0`），最近按最后打开时间倒序；「全部 / 回收站」仍可点。
+- 真机实测（SO-03J，1.27）：音乐/书页/书库三处半按均能播放↔暂停；书页第 2/748 页进音乐再回，截图 SHA256 完全一致；书库→音乐→快门回书库，默认仍是「最近」；有书时点「阅读」回原书原页（截图逐字节一致），无书时进书库。
+
+## v1.26 (vc30) — 2026-11-24 00:20
+
+- 音乐界面**半按快门 = 播放/暂停**：`MainActivity.dispatchKeyEvent` 收到 `KEYCODE_FOCUS` 首次按下时，向本进程的 `MediaService` 发 `ACTION_PLAY_PAUSE`，与阅读页半按同一条路径；抬起和长按重复事件继续吞掉，不会漏给系统相机。至此三个界面（音乐/书页/书库）半按快门都是切歌，全按一律是界面切换。
+- 版本：versionCode 30 / versionName 1.26。
+
+## v1.25 (vc29) — 2026-11-24 00:05
+
+- 阅读界面（书页与书库）**半按快门 = 播放/暂停音乐**：`KEYCODE_FOCUS` 按下即发 `Intent` 到启动器进程的 `MediaService`（`action_play_pause`），直连前台播放服务，不经过 UI；全按仍是回音乐界面。半按只认 `repeatCount == 0`，长按重复事件全部吞掉，也不会漏给系统相机。
+- 再核对「点阅读没反应」的两处修补仍在：回音乐/开书库改用纯组件 intent；`ClassicReaderActivity.onNewIntent` 重画书架；阅读入口启动失败弹提示。
+- 版本：versionCode 29 / versionName 1.25。
+
+## v1.24 (vc28) — 2026-11-23 23:40
+
+- Xperia 实体快门键（`KEYCODE_CAMERA`，半按 `KEYCODE_FOCUS` 只吞掉不触发系统相机）接进三个界面：相机页当快门拍照、音乐界面回上次阅读、书库界面回音乐。
+- 阅读页与书库拆到独立任务：`HorizontalViewActivity` / `VerticalViewActivity` / `ClassicReaderActivity` 的 `taskAffinity` 改成 `io.github.xejohv.reader`（书库同时 `launchMode="singleTask"`）。这样从书页按快门回音乐时，音乐界面（`MainActivity` 是 `singleTask` 任务根）启动不会把上面的书页清掉，**整本书连同页码留在后台任务里**。
+- 书页快门：不 `finish()`，只把启动器叫到前台，并把「在哪本书、哪个任务」写进 `PodSwitch` 偏好（`haveBook` / `taskId` / `book`，`MODE_MULTI_PROCESS` 跨进程读）。
+- 音乐快门（`dispatchKeyEvent`）：`haveBook` 为真就用 `ActivityManager.moveTaskToFront(taskId)` 把阅读任务整体提到前台——不重开文档、不重新排版、页码不丢；任务被系统回收时退化为按 `book` 路径重开阅读页；`haveBook` 为假则打开书库。
+- 书库快门：`libraryToMusic()`——先清 `haveBook`，再 `finishAffinity()` 清空整个阅读任务（书库和后台残留的书页一起结束），然后回音乐；之后音乐按快门就是进书库。书库 `onResume` 也会把 `haveBook` 置假，所以「看书 → 返回书库」也视为阅读后台已清。
+- 版本：versionCode 28 / versionName 1.24。
+
+### 一并修：从阅读退回音乐后「点阅读没反应」
+- 根因：回音乐用的 intent 带了 `ACTION_MAIN` + `CATEGORY_HOME`，系统会把启动器当成“主界面”塞进另一个任务，于是应用同时存在两个 affinity 相同的任务；之后 `ReaderBridge` 再用 `FLAG_ACTIVITY_NEW_TASK` 拉书库时，新页面可能被放到当前音乐界面**背后**，看起来就是点了没反应。
+- 修法：回音乐、开书库一律改成**纯组件 intent**（`setClassName` + `NEW_TASK` + `RESET_TASK_IF_NEEDED`），不再借 `ACTION_MAIN/CATEGORY_HOME` 的语义；`ReaderBridge.open` 同步去掉 `ACTION_MAIN`。
+- 兜底：`ClassicReaderActivity` 补 `onNewIntent` → `reload()`，singleTask 复用旧实例也重画书架；`AppsView` 的阅读入口在 `ReaderBridge.open` 返回 false 时弹「阅读器启动失败」，不再静默失败。
+
 ## v1.22 (vc26) — 2026-11-23 23:10
 
 - 书库顶栏右上角新增「导入」：Android 的 MTP 在 Android 8 上无法把自建目录稳定显示成文件夹（`Download/Books` 即使索引行 `format=12289`/`mime_type=vnd.android.document/directory` 也可能被画成空白文件），于是改走用户路线——**电子书丢进 `Download` 根目录**（这个系统目录在电脑上永远是正常文件夹），在书库里点「导入 N」一键搬进 `Download/Books`。

@@ -11,6 +11,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -331,6 +332,90 @@ class MainActivity : AppCompatActivity() {
     }
 
      */
+
+    /** Xperia 的实体快门键（KEYCODE_CAMERA）：相机页当快门，其余界面在音乐与阅读之间来回切。 */
+    override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
+        if (event != null) {
+            val code = event.keyCode
+            if (code == KeyEvent.KEYCODE_CAMERA || code == KeyEvent.KEYCODE_FOCUS) {
+                // 半按（FOCUS）= 播放/暂停音乐；其余半按事件（抬起、长按重复）一律吞掉，
+                // 不能漏给系统，否则会拉起系统相机
+                if (code == KeyEvent.KEYCODE_FOCUS) {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                        togglePlayPause()
+                    }
+                    return true
+                }
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 && !Core.lock) {
+                    val view = Core.getView()
+                    if (view is io.github.xejohv.podclassicxzs.view.CameraView) {
+                        view.shutter()
+                    } else {
+                        resumeReading()
+                    }
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * 音乐界面半按快门：直接给前台播放服务发一条 play/pause 指令（与阅读页半按走同一条路）。
+     */
+    private fun togglePlayPause() {
+        try {
+            val i = Intent()
+            i.setClassName(packageName, "io.github.xejohv.podclassicxzs.service.MediaService")
+            i.action = io.github.xejohv.podclassicxzs.service.MediaService.ACTION_PLAY_PAUSE
+            startService(i)
+        } catch (t: Throwable) {
+        }
+    }
+
+    /**
+     * 音乐界面按快门：按上次离开的位置继续——书页还活着就直接把阅读任务提到前台（不重开、不重排），
+     * 书页已被回收或上次是从书库出来的，则打开书库。
+     */
+    private fun resumeReading() {
+        val sp = getSharedPreferences("PodSwitch", Context.MODE_MULTI_PROCESS)
+        if (sp.getBoolean("haveBook", false)) {
+            val taskId = sp.getInt("taskId", -1)
+            if (taskId > 0) {
+                try {
+                    val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                    am.moveTaskToFront(taskId, 0)
+                    return
+                } catch (t: Throwable) {
+                }
+            }
+            val path = sp.getString("book", null)
+            if (path != null && java.io.File(path).exists()) {
+                try {
+                    val i = Intent(Intent.ACTION_VIEW)
+                    i.setClassName(packageName, "com.foobnix.pdf.search.activity.HorizontalViewActivity")
+                    i.setDataAndType(android.net.Uri.fromFile(java.io.File(path)), "*/*")
+                    i.putExtra("EXTRA_FILE", path)
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(i)
+                    return
+                } catch (t: Throwable) {
+                }
+            }
+        }
+        openReader()
+    }
+
+    /** 打开书库。 */
+    private fun openReader() {
+        try {
+            val i = Intent()
+            i.setClassName(packageName, "io.github.xejohv.classic.ClassicReaderActivity")
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(i)
+        } catch (t: Throwable) {
+        }
+    }
 
     override fun onBackPressed() {
         if (Values.LAUNCHER) {

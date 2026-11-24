@@ -103,7 +103,10 @@ class AppsView(context: Context) : ItemListView(
     // 阅读：拉起独立进程的 Librera Classic；阅读器缺失时只提示，不影响桌面与播放
     private val readerItem = Item(Strings.BOOKS, object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-            ReaderBridge.open(context)
+            // 有书在后台就回到原书原页码，没有才进书库
+            if (!ReaderBridge.resumeOrOpen(context)) {
+                android.widget.Toast.makeText(context, "阅读器启动失败", android.widget.Toast.LENGTH_SHORT).show()
+            }
             return true
         }
     }, true)

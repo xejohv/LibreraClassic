@@ -1,5 +1,6 @@
 package io.github.xejohv.podclassicxzs.util
 
+import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -15,10 +16,11 @@ import java.io.File
  */
 object ReaderBridge {
     private const val READER_ENTRY = "io.github.xejohv.classic.ClassicReaderActivity"
+    private const val BOOK_PAGE = "com.foobnix.pdf.search.activity.HorizontalViewActivity"
 
     /** 打开书库；path 非空时直接打开该书 */
     fun open(context: Context, path: String? = null): Boolean {
-        val intent = Intent(Intent.ACTION_MAIN).apply {
+        val intent = Intent().apply {
             component = ComponentName(context.packageName, READER_ENTRY)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -33,6 +35,41 @@ object ReaderBridge {
         } catch (e: Exception) {
             false
         }
+    }
+
+    /**
+     * 桌面「阅读」入口：书页还在后台就直接把阅读任务提回前台（页码原样保留），
+     * 没有书页才打开书库。与实体快门全按的行为保持一致。
+     */
+    fun resumeOrOpen(context: Context): Boolean {
+        val sp = context.getSharedPreferences("PodSwitch", Context.MODE_MULTI_PROCESS)
+        if (sp.getBoolean("haveBook", false)) {
+            val taskId = sp.getInt("taskId", -1)
+            if (taskId > 0) {
+                try {
+                    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                    am.moveTaskToFront(taskId, 0)
+                    return true
+                } catch (t: Throwable) {
+                }
+            }
+            val path = sp.getString("book", null)
+            if (path != null && File(path).exists()) {
+                try {
+                    val intent = Intent().apply {
+                        component = ComponentName(context.packageName, BOOK_PAGE)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        action = Intent.ACTION_VIEW
+                        setDataAndType(Uri.fromFile(File(path)), mimeOf(path))
+                        putExtra("EXTRA_FILE", path)
+                    }
+                    context.startActivity(intent)
+                    return true
+                } catch (t: Throwable) {
+                }
+            }
+        }
+        return open(context)
     }
 
     fun mimeOf(path: String): String = when (path.substringAfterLast('.', "").lowercase()) {

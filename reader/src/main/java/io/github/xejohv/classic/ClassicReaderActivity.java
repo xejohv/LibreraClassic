@@ -40,8 +40,8 @@ public class ClassicReaderActivity extends Activity {
     /** One folder, decided here: everything the reader shows lives in /sdcard/Download/Books (plus旧位置兼容). */
     private final List<File> roots = new ArrayList<>();
     private LinearLayout listBox;
-    /** 0 = 最近（打开过的），1 = 全部，2 = 回收站。 */
-    private int mode = 1;
+    /** 0 = 最近（打开过的），1 = 全部，2 = 回收站。书库打开就落在「最近」。 */
+    private int mode = 0;
     private final TextView[] segTabs = new TextView[3];
     /** 顶栏右上角的「导入」：把 Download 里的电子书搬进 Download/Books。 */
     private TextView importBtn;
@@ -61,9 +61,32 @@ public class ClassicReaderActivity extends Activity {
         reload();
     }
 
+    /** 实体快门键：在书库里按一下，回音乐界面（跟左上角「音乐」同一个出口）。 */
+    @Override
+    public boolean onKeyDown(int keyCode, android.view.KeyEvent event) {
+        if (keyCode == android.view.KeyEvent.KEYCODE_CAMERA || keyCode == android.view.KeyEvent.KEYCODE_FOCUS) {
+            if (event.getRepeatCount() == 0) {
+                if (keyCode == android.view.KeyEvent.KEYCODE_CAMERA) {
+                    // 从书库离开 = 阅读后台清零
+                    libraryToMusic();
+                } else {
+                    toggleMusic();
+                }
+            }
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        // 人在书库就等于没在看书：从书库离开音乐时阅读后台要清掉，下次快门进书库
+        try {
+            getSharedPreferences("PodSwitch", MODE_MULTI_PROCESS).edit()
+                    .putBoolean("haveBook", false).remove("book").apply();
+        } catch (Throwable ignored) {
+        }
         // coming back from a page: the row has to say where the reader got to
         if (listBox != null) {
             reload();
@@ -669,11 +692,53 @@ public class ClassicReaderActivity extends Activity {
      * 退出阅读：阅读器自己收尾，再把桌面（音乐主界面）唤到前台。
      * 合并后没有悬浮返回条，菜单键/书库左上的返回就是唯一出口。
      */
+    /** 半按快门：切一下播放/暂停（阅读器进程直接向启动器的播放服务发指令）。 */
+    private void toggleMusic() {
+        try {
+            Intent i = new Intent();
+            i.setClassName(getPackageName(), "io.github.xejohv.podclassicxzs.service.MediaService");
+            i.setAction("action_play_pause");
+            startService(i);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** singleTask 复用旧实例时也要把书架重画一遍，避免“点阅读进来是空的/停在旧状态”。 */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        try {
+            reload();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 从书库返回音乐：书库和留在后台的书页一起清掉，阅读任务不残留。 */
+    private void libraryToMusic() {
+        try {
+            getSharedPreferences("PodSwitch", MODE_MULTI_PROCESS).edit()
+                    .putBoolean("haveBook", false).remove("book").apply();
+        } catch (Throwable ignored) {
+        }
+        finishAffinity();
+        try {
+            // 纯组件启动：带 ACTION_MAIN/CATEGORY_HOME 会把桌面拽去“主界面任务”，
+            // 之后再用 NEW_TASK 拉阅读器就可能落在音乐界面背后（点了像没反应）
+            Intent home = new Intent();
+            home.setClassName(getPackageName(), "io.github.xejohv.podclassicxzs.activity.MainActivity");
+            home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            startActivity(home);
+        } catch (Throwable ignored) {
+        }
+    }
+
     private void finishToMusic() {
         finish();
         try {
-            Intent home = new Intent(Intent.ACTION_MAIN);
-            home.addCategory(Intent.CATEGORY_HOME);
+            // 纯组件启动：带 ACTION_MAIN/CATEGORY_HOME 会把桌面拽去“主界面任务”，
+            // 之后再用 NEW_TASK 拉阅读器就可能落在音乐界面背后（点了像没反应）
+            Intent home = new Intent();
             home.setClassName(getPackageName(), "io.github.xejohv.podclassicxzs.activity.MainActivity");
             home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
             startActivity(home);

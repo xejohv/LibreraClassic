@@ -1725,6 +1725,8 @@ public class HorizontalViewActivity extends AdsFragmentActivity {
     protected void onResume() {
         super.onResume();
 
+        podSaveSwitchState();
+
         PodSkin.applyReaderChrome(this);
         io.github.xejohv.classic.PodReader.install(this, dc);
         // the pod shell draws outside the reader, so it needs the page's controller by name
@@ -2635,6 +2637,52 @@ public class HorizontalViewActivity extends AdsFragmentActivity {
         return super.onKeyUp(keyCode, event);
     }
 
+    /** 半按快门：让启动器进程里的播放服务切一下播放/暂停（两进程同一安装包，startService 直达）。 */
+    private void podToggleMusic() {
+        try {
+            Intent i = new Intent();
+            i.setClassName(getPackageName(), "io.github.xejohv.podclassicxzs.service.MediaService");
+            i.setAction("action_play_pause");
+            startService(i);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 记下“现在在看书”这件事：哪本书、哪个任务，音乐界面按快门时直接把这个任务提到前台。 */
+    private void podSaveSwitchState() {
+        try {
+            String path = null;
+            try {
+                path = com.foobnix.model.AppSP.get().lastBookPath;
+            } catch (Throwable ignored) {
+            }
+            if (path == null || path.isEmpty()) {
+                try {
+                    path = getIntent().getStringExtra("EXTRA_FILE");
+                } catch (Throwable ignored) {
+                }
+            }
+            getSharedPreferences("PodSwitch", MODE_MULTI_PROCESS).edit()
+                    .putBoolean("haveBook", true)
+                    .putInt("taskId", getTaskId())
+                    .putString("book", path)
+                    .apply();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 回音乐主界面：**不关这本书**，只把启动器叫到前台，书页连同页码留在后台任务里。 */
+    private void podBackToMusic() {
+        podSaveSwitchState();
+        try {
+            Intent home = new Intent();
+            home.setClassName(getPackageName(), "io.github.xejohv.podclassicxzs.activity.MainActivity");
+            home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            startActivity(home);
+        } catch (Throwable ignored) {
+        }
+    }
+
     @Override
     public boolean onKeyDown(final int keyCode1, final KeyEvent event) {
 
@@ -2644,6 +2692,18 @@ public class HorizontalViewActivity extends AdsFragmentActivity {
         }
 
         LOG.d("onKeyDown", keyCode, event);
+
+        // 实体快门：半按 = 播放/暂停音乐，全按 = 回音乐界面（相机页的快门不受影响）
+        if (keyCode == KeyEvent.KEYCODE_CAMERA || keyCode == KeyEvent.KEYCODE_FOCUS) {
+            if (event.getRepeatCount() == 0) {
+                if (keyCode == KeyEvent.KEYCODE_CAMERA) {
+                    podBackToMusic();
+                } else {
+                    podToggleMusic();
+                }
+            }
+            return true;
+        }
 
         isMyKey = false;
 

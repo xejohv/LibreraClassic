@@ -150,6 +150,11 @@ class CameraView(context: Context) : FrameLayout(context), ScreenView {
         return true
     }
 
+    /** 实体快门键：跟屏幕上的白色快门圆钮一样拍一张。 */
+    fun shutter() {
+        takePhoto()
+    }
+
     override fun slide(slideVal: Int): Boolean {
         cycleFlash()
         return true
