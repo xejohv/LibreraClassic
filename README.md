@@ -22,7 +22,7 @@ A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an 
 
 - **阅读器不是本项目写的**：`reader/` 整套来自 Librera Reader（安卓上支持格式最多的开源阅读器之一），本项目只在它上面做 iPod 化的界面、纸色、菜单与进程隔离，未删除、未修改任何上游版权与许可声明。
 - **合并后的 APK 整体按 GPL-3.0-or-later 分发**：因为 `reader/` 是 GPLv3 代码，合并产物属于 GPLv3 衍生作品，APK 与阅读器部分的源码必须同许可提供；`app/` 里 PodClassic 派生的代码保留 MIT。再分发 APK 或修改版时须保留全部版权声明、公开对应源码、衍生作品沿用 GPLv3。
-- 全部源码在本仓库公开，即 GPLv3 要求的「对应源码」；GPLv3 全文见 [LICENSES/GPL-3.0.txt](./LICENSES/GPL-3.0.txt)，MIT 全文见 [LICENSE](./LICENSE)，第三方组件归属见 [NOTICE.md](./NOTICE.md)。
+- 全部源码在本仓库公开，即 GPLv3 要求的「对应源码」。仓库根 [LICENSE](./LICENSE) 为 GPLv3 全文（覆盖整体），PodClassic 派生的 MIT 条款单列在 [LICENSE-MIT.txt](./LICENSE-MIT.txt)，第三方组件归属见 [NOTICE.md](./NOTICE.md)。
 - 第三方原生库与素材（PDFium、libarchive、libtiff、DjVuLibre、libmobi、LAME、字体等）各归其上游许可，随源码仓库一并提供。
 - 「iPod」「iPod Classic」是 Apple Inc. 的商标，「Sony」「Xperia」是 Sony 的商标。本项目与这些公司无任何关联，未获其授权或背书，仅为自己一台旧机器的界面致敬，对外名称与蓝牙名沿用 iPod Classic 也仅限个人设备用途。
 - 上游 PodClassic 的原始仓库与账号已下线（IzzyOnDroid 标记 `NoSourceSince`），本仓库是这条代码线的现存延续。
@@ -275,4 +275,4 @@ adb shell settings put secure accessibility_enabled 1
 
 ## License summary
 
-`app/` (PodClassic lineage) is MIT. `reader/` (Librera Reader, Copyright (C) Ivan Ivanenko / foobnix) is GPL-3.0-or-later, therefore the combined APK is distributed under GPL-3.0-or-later. Full texts: [LICENSE](./LICENSE) and [LICENSES/GPL-3.0.txt](./LICENSES/GPL-3.0.txt); third-party attribution in [NOTICE.md](./NOTICE.md). Not affiliated with Apple or Sony; "iPod" and "Xperia" are their owners' trademarks.
+`app/` (PodClassic lineage) is MIT. `reader/` (Librera Reader, Copyright (C) Ivan Ivanenko / foobnix) is GPL-3.0-or-later, therefore the combined APK is distributed under GPL-3.0-or-later. The root [LICENSE](./LICENSE) holds the full GPL-3.0 text; the MIT terms for the PodClassic-derived part are kept separately in [LICENSE-MIT.txt](./LICENSE-MIT.txt); third-party attribution in [NOTICE.md](./NOTICE.md). Not affiliated with Apple or Sony; "iPod" and "Xperia" are their owners' trademarks.
