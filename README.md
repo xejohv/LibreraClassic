@@ -4,8 +4,8 @@
 
 A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an iPod Classic-shaped device: local music player plus e-book reader, one package, one home screen, one click wheel.
 
-**对外发布版本 1.41 / versionCode 45 · 8.48 MB** · 包名 `io.github.xejohv.libreraclassic`
-安装包见 [Releases](https://github.com/xejohv/LibreraClassic/releases) 与 [dist/PodClassic-XZs-1.41.apk](./dist/PodClassic-XZs-1.41.apk)（同一份）；逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)，部署手册见 [docs/DEPLOY.md](./docs/DEPLOY.md)。
+**对外发布版本 1.50 / versionCode 47 · 8.48 MB** · 包名 `io.github.xejohv.libreraclassic`
+安装包见 [Releases](https://github.com/xejohv/LibreraClassic/releases) 与 [dist/PodClassic-XZs-1.50.apk](./dist/PodClassic-XZs-1.50.apk)（同一份）；逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)，部署手册见 [docs/DEPLOY.md](./docs/DEPLOY.md)。
 
 
 ---
@@ -46,6 +46,7 @@ A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an 
 - 长按中央键 = 收藏 / 取消收藏（收藏项名前顶 ★）；随机 / 单曲 / 顺序 / 全部循环只从右上角图标切换。
 - 封面、歌名、艺人、专辑、时间齐全；开关打开时按 LRC 显示歌词；睡眠定时、均衡器、AGC、胆机音效、DC 相位线性器都在设置里。
 - CoverFlow 可左右转动浏览专辑；列表分歌曲 / 专辑 / 表演者 / 收藏 / 当前播放列表。
+- **切歌震动**：手动切歌（转盘、机身键、耳机线控）轻震一下；自动播完续下一首完全不震。播放通知走 `IMPORTANCE_LOW` 静默渠道，换歌重建通知不再自带系统震动。
 
 ## 阅读（内建 Librera Reader）
 
@@ -62,9 +63,9 @@ A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an 
 
 ## 快门键
 
-- **半按 = 播放 / 暂停**，音乐界面、书页、书库三处一致。
+- **半按不承担任何功能**：Xperia 的半按行程极短，看书时手指一蹭就会触发，所以这个手势整体取消。为免系统把半按当成对焦去拉起相机，`FOCUS` 事件仍由本应用吞掉，只是什么都不做。
 - **全按 = 界面切换**：音乐界面 → 回到上次的书页（页码原样）；书页 / 书库 → 回音乐，书页留在后台任务里不清空；只有从书库退出才结束阅读后台。
-- 半按与全按严格区分：全按在固件上先发 `FOCUS(DOWN)` 再发 `CAMERA`，所以半按改为 `FOCUS` 抬起后确认、留 180ms 观察窗，见到 `CAMERA` 就按全按处理，不会顺带切歌。
+- **锁屏时不响应**：亮屏但未解锁时，半按与全按都被吞掉，不会越过解锁直接跳进阅读。
 
 ## 附加程序
 
@@ -84,12 +85,13 @@ A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an 
 | 音效 | 音效说明、均衡器、系统 AGC、TomSteady、胆机音效、DC 相位线性器 |
 | 录音 | 录音质量 |
 | 外观与操作 | 夜间模式、机身配色、屏幕亮度（自动 / 20 / 40 / 60 / 80 / 100%）、按键反馈 |
-| 系统 | 关于本机、语言、辅助功能、资源监视器、结束阅读进程、恢复所有设置 |
+| 系统 | 关于本机、语言、辅助功能、资源监视器、结束阅读进程、锁屏自动熄屏、恢复所有设置 |
 
 - **关于本机**只读：音乐 / 视频 / 照片 / 容量 / 可用容量 / 版本 / S/N；车型明细进「容量」二级页；版本行连点 6 次进系统设置。
 - **辅助功能**行显示实时状态，从系统设置开关回来立刻刷新，不用退桌面。
 - **资源监视器**固定八行（可用内存 / 内存总量 / 内存占用 / 本应用内存 / 本应用 CPU / 应用进程 / 电池 / 电池温度），进页面自动读一次，按控制盘中心键重读。
 - **结束阅读进程**：右侧实时显示 `:reader` 在跑还是在歇，点一下当场结束。
+- **锁屏自动熄屏**：右侧实时显示已启用 / 未启用。点「未启用」拉起系统设备管理员授权页（授权说明只写「锁屏 5 秒无人操作时自动熄屏」，不申请擦除数据、不设密码策略），启用后进系统设备管理页可撤销。
 - **恢复所有设置**只留「恢复」一行：重置转盘偏好 → 纸色回夜间 → 清曲库索引缓存 → 偏好落盘 → 语言按默认重套 → 重启进程。
 - 语言：自动 / 简体中文 / 繁体中文 / English，切换即时生效。
 
@@ -98,6 +100,7 @@ A single-APK retrofit that turns a **Sony Xperia XZs (SO-03J, docomo)** into an 
 - 底部上滑 = 回桌面，底部上滑长按 = 最近任务；左、右侧滑 = 返回。
 - 长按音量下键 1.2 秒 = 回桌面（从相机等外部应用逃生）。
 - 顶部拦截下拉状态栏；系统电源菜单被替换成 PodClassic 风格；锁屏是自绘滑动解锁。
+- 锁屏时钟每秒刷新，静置也不会冻住；亮屏锁屏后 5 秒无人操作自动熄屏（需在设置→系统→锁屏自动熄屏里启用，见上）。
 - 插线自动选「传输文件」，MTP 授权弹窗自动点「允许」（只在文案同时匹配时动手）。
 - 进入系统设置、相机等没有导航栏的界面时，顶部覆盖一条悬浮返回条（`‹ 返回` / `iPod`）。
 - 每次覆盖安装后无障碍绑定会被系统清空，标题栏出现红色「!」，需重新到系统无障碍页开启服务。
@@ -138,7 +141,7 @@ adb shell settings put secure accessibility_enabled 1
 | 分辨率 | 1080×1920，density 480（densityDpi 540） |
 | minSdk / targetSdk | 26 / 34 |
 | applicationId | `io.github.xejohv.libreraclassic` |
-| 版本 | 1.41（versionCode 45） |
+| 版本 | 1.50（versionCode 47） |
 
 ## 已知限制
 
@@ -171,6 +174,7 @@ A single-APK retrofit for a **Sony Xperia XZs (SO-03J)**: iTunes-era iPod Classi
 - Long-press center = favourite / unfavourite (starred entries get a ★). Shuffle / single / sequential / repeat toggle from the top-right icon only.
 - Cover art, title, artist, album, times; LRC lyrics when enabled; sleep timer; equalizer, system AGC, TomSteady, tube-amp and DC phase linearizer in Settings.
 - CoverFlow browsing; lists for songs / albums / artists / favourites / current playlist.
+- **Track-change haptics**: switching by hand (wheel, hardware keys, headset remote) gives a short 15 ms buzz; tracks advancing by themselves after a song ends stay completely silent. The playback notification uses an `IMPORTANCE_LOW` silent channel, so rebuilding it on every track no longer drags in the system's default vibration.
 
 ## Reading (built-in Librera Reader)
 
@@ -187,9 +191,9 @@ A single-APK retrofit for a **Sony Xperia XZs (SO-03J)**: iTunes-era iPod Classi
 
 ## Shutter button
 
-- **Half press = play / pause**, identical on the music screen, the book page and the library.
+- **Half press does nothing**: the Xperia's half-press travel is so short that a finger brushing the key while reading would fire it, so the gesture is gone entirely. The `FOCUS` event is still swallowed by the app so the system cannot treat it as autofocus and jump into the camera — it simply has no effect.
 - **Full press = switch screens**: music → last book page, same page number; book page / library → music, with the book page kept alive in the background task. Only leaving from the library clears the reader.
-- Half and full press are separated properly: the firmware sends `FOCUS(DOWN)` before `CAMERA`, so play/pause now commits on `FOCUS` release with a 180 ms window; seeing `CAMERA` means full press and no track change.
+- **Ignored while locked**: with the screen on but not unlocked, both half and full press are swallowed — the shutter can no longer skip the lock screen and drop you into the reader.
 
 ## Extra Apps
 
@@ -209,12 +213,13 @@ Five groups:
 | Sound | sound help, equalizer, system AGC, TomSteady, tube amp, DC phase linearizer |
 | Recording | recording quality |
 | Look & controls | night mode, body colour, screen brightness (auto / 20 / 40 / 60 / 80 / 100%), key feedback |
-| System | About, language, accessibility, resource monitor, end reader process, restore all settings |
+| System | About, language, accessibility, resource monitor, end reader process, lock-screen auto sleep, restore all settings |
 
 - **About** is read-only: songs / videos / photos / capacity / free / version / serial; storage details in a sub-page; tapping the version row 6 times opens system settings.
 - **Accessibility** row reflects live state — toggling it in system settings updates the row immediately.
 - **Resource monitor** is a fixed eight rows (free RAM / total RAM / used RAM / this app's RAM / this app's CPU / app processes / battery / battery temperature), read once on entry, refreshed by pressing the wheel centre.
 - **End reader process** shows whether `:reader` is running and kills it on tap.
+- **Lock-screen auto sleep** shows enabled / disabled live. Tapping "disabled" opens the system device-admin prompt (its explanation states only "turn the screen off after 5 s idle on the lock screen"; no data wipe, no password policy); once enabled, the row opens the device-admin page where it can be revoked.
 - **Restore all settings**: one "Restore" row only — wheel prefs, paper colour back to night, library index cache cleared, prefs flushed, language reset, process restarted.
 - Language: auto / Simplified Chinese / Traditional Chinese / English, applied in place.
 
@@ -223,6 +228,7 @@ Five groups:
 - Swipe up from the bottom = home; long swipe-up = recents; swipe from either edge = back.
 - Hold volume-down 1.2 s = home (escape hatch from camera or other apps).
 - Top strip blocks the notification shade; the system power menu is replaced by the PodClassic one; lock screen is a custom slide-to-unlock.
+- The lock-screen clock ticks every second and no longer freezes while idle; with the screen on and locked, the display turns off after 5 s without input (requires the Settings → System → lock-screen auto sleep row, see above).
 - Plugging in USB auto-selects "Transfer files" and auto-accepts the MTP prompt (only when the exact labels match).
 - System settings and camera have no navigation bar, so a floating `‹ Back` / `iPod` bar is overlaid there.
 - Every reinstall clears the accessibility binding, which brings back the red !; re-enable the service in system accessibility settings.
@@ -263,7 +269,7 @@ adb shell settings put secure accessibility_enabled 1
 | Screen | 1080×1920, density 480 (densityDpi 540) |
 | minSdk / targetSdk | 26 / 34 |
 | applicationId | `io.github.xejohv.libreraclassic` |
-| Version | 1.41 (versionCode 45) |
+| Version | 1.50 (versionCode 47) |
 
 ## Known limits
 
